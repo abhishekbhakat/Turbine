@@ -257,13 +257,6 @@ volumes:
       type: none
       device: {1}/include
 
-# networks:
-#   compose:
-#     driver: farm
-#     ipam:
-#       driver: farm
-#       config:
-#         - subnet: 172.22.0.0/16
 networks:
   farm:
     external: true
