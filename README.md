@@ -1,5 +1,11 @@
 # Windmill
-Simple python script for local airflow deployment with docker. Added components are elasticsearch logging, smtp server for email alerts, hashicorp vault for secrets backend. Will be adding more going forward
+Simple python script for local airflow deployment with docker. Added components are 
+- elasticsearch logging
+- smtp server for email alerts
+- hashicorp vault for secrets backend
+- vscode server for ide
+
+Will be adding more going forward
 
 ## Usage
 
@@ -33,6 +39,8 @@ Flower: http://localhost:5557
 Vault: http://localhost:8200
 Opensearch: http://localhost:5601/app/home#/
 ```
+
+Logs for deployment are collected in `start.log`.
 
 ## Vault
 For vault to work, we have to manually create a keys to unseal the vault and root_token will be auto generated. After that, the root_token needs to be updated on the Dockerfile with AIRFLOW__SECRETS__BACKEND_KWARGS.

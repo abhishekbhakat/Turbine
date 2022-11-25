@@ -61,7 +61,7 @@ USER root
 RUN mkdir /usr/local/airflow
 USER logstash
 """
-#codec => "line" or "json"
+# codec => "line" or "json"
 LOGCONF = """# logstash.conf
 input {
   file {
@@ -235,7 +235,22 @@ services:
     networks:
       farm:
         ipv4_address: "172.22.0.110"
-
+  code:
+    hostname: code
+    build:
+      context: .
+      dockerfile: code.Dockerfile
+    volumes:
+      - dags:/usr/local/airflow/dags
+      - logs:/usr/local/airflow/logs
+      - plugins:/usr/local/airflow/plugins
+      - include:/usr/local/airflow/include
+    ports:
+      - "6666:6666"
+    restart: always
+    networks:
+      farm:
+        ipv4_address: "172.22.0.111"
 volumes:
   dags:
     driver: local
@@ -294,7 +309,7 @@ echo "Preping db..."
 docker run -it --net farm -e PGPASSWORD=postgres {0}:latest psql -h 172.22.0.1 -U postgres -c 'CREATE DATABASE "{0}";' >> start.log 2>&1  
 if [ $? -eq 0 ]
 then 
-    docker run -it --net farm  {0}:latest airflow db init && \
+    docker run -it --net farm  {0}:latest airflow db init >> start.log 2>&1
     docker run -it --net farm {0}:latest airflow users create --username admin --firstname FIRST_NAME  --lastname LAST_NAME --role Admin --email admin@example.org --password admin >> start.log 2>&1  
 else
     docker run -it --net farm  {0}:latest airflow db upgrade >> start.log 2>&1  
@@ -308,19 +323,20 @@ echo "Deployed:"
 echo "Airflow: http://localhost:8080"
 echo "Airflow Swagger: http://localhost:8080/api/v1/ui/"
 echo "Flower: http://localhost:5555"
+echo "IDE: http://localhost:6666"
 echo "Vault: http://localhost:8200"
 echo "Opensearch: http://localhost:5601/app/home#/"
 """
 
-STOP="""docker-compose down"""
+STOP = """docker-compose down"""
 
 CLEAN = """sed -r '/^\s*$/d' $1 > tmpfile && mv tmpfile $1"""
 
-VAULTDOCKER="""FROM vault:latest
+VAULTDOCKER = """FROM vault:latest
 COPY vault.json /vault/config/vault.json
 CMD ["vault", "server", "-config=/vault/config/vault.json"]
 """
-VAULTJSON="""{         
+VAULTJSON = """{         
   "ui" : "true",
   "disable_mlock" : "true",                        
   "listener":  {                     
@@ -341,11 +357,11 @@ VAULTJSON="""{
 }
 """
 
-FARMSTART="""docker network create -d bridge --gateway 172.22.0.1 --subnet 172.22.0.1/16 farm
+FARMSTART = """docker network create -d bridge --gateway 172.22.0.1 --subnet 172.22.0.1/16 farm
 docker-compose up -d
 """
 
-FARMCOMPOSE="""services:
+FARMCOMPOSE = """services:
   database:
     image: postgres
     environment:
@@ -476,91 +492,129 @@ networks:
     external: true
 """
 
-FARMSMTPDOCKER="""FROM python:3.9
+FARMSMTPDOCKER = """FROM python:3.9
 RUN pip install sendria
 EXPOSE 1025
 """
 
+CODEDOCKERFILE = """FROM codercom/code-server:latest
+USER root
+RUN mkdir /usr/local/airflow && chmod -R 766 /usr/local/airflow
+RUN mkdir -p .config/code-server
+ARG DEFAULT_WORKSPACE=/usr/local/airflow
+ENV PASSWORD=admin
+ENTRYPOINT ["/usr/bin/code-server","--bind-addr","0.0.0.0:6666","--disable-telemetry","--auth","password","/usr/local/airflow"]"""
+
+
 def get_or_create_farm():
-  farm = 'farm'
-  if not os.path.exists(farm):
-    print("Creating new farm...")
-    os.makedirs(farm)
-    with open(os.path.join(farm,'vault.Dockerfile'),'w') as f:
-        f.write(VAULTDOCKER.format(farm))
-    with open(os.path.join(farm,'vault.json'),'w') as f:
-        f.write(VAULTJSON)
-    with open(os.path.join(farm,'start.sh'),'w') as f:
-        f.write(FARMSTART)
-    with open(os.path.join(farm,'smtp.Dockerfile'),'w') as f:
-        f.write(FARMSMTPDOCKER)
-    with open(os.path.join(farm,'docker-compose.yml'),'w') as f:
-        f.write(FARMCOMPOSE)
-    os.chmod(os.path.join(farm,'start.sh'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
-    print("New farm created using network as 172.22.0.1/16!")
-  else:
-    print("Existing farm found!")
+    farm = "farm"
+    if not os.path.exists(farm):
+        print("Creating new farm...")
+        os.makedirs(farm)
+        with open(os.path.join(farm, "vault.Dockerfile"), "w") as f:
+            f.write(VAULTDOCKER.format(farm))
+        with open(os.path.join(farm, "vault.json"), "w") as f:
+            f.write(VAULTJSON)
+        with open(os.path.join(farm, "start.sh"), "w") as f:
+            f.write(FARMSTART)
+        with open(os.path.join(farm, "smtp.Dockerfile"), "w") as f:
+            f.write(FARMSMTPDOCKER)
+        with open(os.path.join(farm, "docker-compose.yml"), "w") as f:
+            f.write(FARMCOMPOSE)
+        os.chmod(
+            os.path.join(farm, "start.sh"), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO
+        )
+        print("New farm created using network as 172.22.0.1/16!")
+    else:
+        print("Existing farm found!")
+
 
 def porter(init):
-  result = 1
-  for i in range(init,65535):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    result = sock.connect_ex(('127.0.0.1',i))
-    sock.close()
-    if result != 0:
-      break
-  return i
+    result = 1
+    for i in range(init, 65535):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        result = sock.connect_ex(("127.0.0.1", i))
+        sock.close()
+        if result != 0:
+            break
+    return i
+
 
 def get_network():
-  for i in range(255):
-    cmd = "grep -rl '172.22.{}' *"
-    res = subprocess.Popen([cmd.format(i)],shell=True, stdout=subprocess.DEVNULL)
-    res.communicate()
-    if res.returncode == 1:
-        break
-  return '172.22.{}'.format(i)
+    for i in range(255):
+        cmd = "grep -rl '172.22.{}' *"
+        res = subprocess.Popen([cmd.format(i)], shell=True, stdout=subprocess.DEVNULL)
+        res.communicate()
+        if res.returncode == 1:
+            break
+    return "172.22.{}".format(i)
 
-def create_folder_and_copy_utils(folder_name): 
+
+def create_folder_and_copy_utils(folder_name):
     web_p = porter(8080)
-    flower_p = porter(5555)     
+    flower_p = porter(5555)
+    code_p = porter(6666)
     network = get_network()
-    print('Using port {} for webserver and {} for flower.'.format(str(web_p),str(flower_p)))
-    print('Using network: '+network+'.1')
+    print(
+        "Using port {} for webserver, {} for flower and {} for IDE".format(
+            str(web_p), str(flower_p), str(code_p)
+        )
+    )
+    print("Using network: " + network + ".1")
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
-        os.makedirs(os.path.join(folder_name,'dags'))
-        os.makedirs(os.path.join(folder_name,'logs'))
-        os.makedirs(os.path.join(folder_name,'plugins'))
-        os.makedirs(os.path.join(folder_name,'include'))
+        os.makedirs(os.path.join(folder_name, "dags"))
+        os.makedirs(os.path.join(folder_name, "logs"))
+        os.makedirs(os.path.join(folder_name, "plugins"))
+        os.makedirs(os.path.join(folder_name, "include"))
     else:
         print("The folder already exists!")
         sys.exit()
-    with open(os.path.join(folder_name,'Dockerfile'),'w') as f:
+    with open(os.path.join(folder_name, "Dockerfile"), "w") as f:
         key = "{} is a local dev project, Do not use in production.".format(folder_name)
-        fernet = base64.b64encode(key.encode('ascii')).decode("ascii")
-        f.write(DOCKERFILE.format(folder_name,fernet))
-    with open(os.path.join(folder_name,'packages.txt'),'w') as f:
+        fernet = base64.b64encode(key.encode("ascii")).decode("ascii")
+        f.write(DOCKERFILE.format(folder_name, fernet))
+    with open(os.path.join(folder_name, "packages.txt"), "w") as f:
         f.write(PACKAGES)
-    with open(os.path.join(folder_name,'docker-compose.yaml'),'w') as f:
-        draft = COMPOSE.format(folder_name,"${PWD}").replace('8080:8080',str(web_p)+':8080').replace('5555:5555',str(flower_p)+':5555')
-        draft = draft.replace('172.22.0',network)
+    with open(os.path.join(folder_name, "docker-compose.yaml"), "w") as f:
+        draft = (
+            COMPOSE.format(folder_name, "${PWD}")
+            .replace("8080:8080", str(web_p) + ":8080")
+            .replace("5555:5555", str(flower_p) + ":5555")
+            .replace("6666:6666", str(code_p) + ":6666")
+        )
+        draft = draft.replace("172.22.0", network)
         f.write(draft)
-    with open(os.path.join(folder_name,'start.sh'),'w') as f:
-        f.write(START.format(folder_name).replace('8080',str(web_p)).replace('5555',str(flower_p)))
-    with open(os.path.join(folder_name,'stop.sh'),'w') as f:
+    with open(os.path.join(folder_name, "start.sh"), "w") as f:
+        f.write(
+            START.format(folder_name)
+            .replace("8080", str(web_p))
+            .replace("5555", str(flower_p))
+            .replace("6666", str(code_p))
+        )
+    with open(os.path.join(folder_name, "stop.sh"), "w") as f:
         f.write(STOP)
-    with open(os.path.join(folder_name,'clean.sh'),'w') as f:
+    with open(os.path.join(folder_name, "clean.sh"), "w") as f:
         f.write(CLEAN)
-    with open(os.path.join(folder_name,'log.Dockerfile'),'w') as f:
+    with open(os.path.join(folder_name, "log.Dockerfile"), "w") as f:
         f.write(LOGDOCKERFILE)
-    with open(os.path.join(folder_name,'logstash.conf'),'w') as f:
-        f.write(LOGCONF.replace('filebeat',folder_name))
-    with open(os.path.join(folder_name,'requirements.txt'),'w') as f:
+    with open(os.path.join(folder_name, "logstash.conf"), "w") as f:
+        f.write(LOGCONF.replace("filebeat", folder_name))
+    with open(os.path.join(folder_name, "requirements.txt"), "w") as f:
         f.write(REQUIREMENTS)
-    os.chmod(os.path.join(folder_name,'start.sh'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
-    os.chmod(os.path.join(folder_name,'stop.sh'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
-    os.chmod(os.path.join(folder_name,'clean.sh'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
-
+    with open(os.path.join(folder_name, "code.Dockerfile"), "w") as f:
+        f.write(CODEDOCKERFILE.replace("6666", str(code_p)))
+    os.chmod(
+        os.path.join(folder_name, "start.sh"),
+        stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO,
+    )
+    os.chmod(
+        os.path.join(folder_name, "stop.sh"), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO
+    )
+    os.chmod(
+        os.path.join(folder_name, "clean.sh"),
+        stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO,
+    )
 
 
 get_or_create_farm()
