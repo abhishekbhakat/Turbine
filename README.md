@@ -6,8 +6,7 @@ Simple python script for local airflow deployment with docker. Added components 
 ```
 python Windmill.py
 ```
-## Vault
-For vault to work, we have to manually create a keys to unseal the vault and root_token will be auto generated. After that, the root_token needs to be updated on the Dockerfile with AIRFLOW__SECRETS__BACKEND_KWARGS.
+
 ### Sample output
 ```
 Creating new farm...
@@ -33,4 +32,13 @@ Airflow Swagger: http://localhost:8082/api/v1/ui/
 Flower: http://localhost:5557
 Vault: http://localhost:8200
 Opensearch: http://localhost:5601/app/home#/
+```
+
+## Vault
+For vault to work, we have to manually create a keys to unseal the vault and root_token will be auto generated. After that, the root_token needs to be updated on the Dockerfile with AIRFLOW__SECRETS__BACKEND_KWARGS.
+
+### Sample command to add secrets from vault shell
+```
+vault secrets enable -path=airflow/ kv-v2
+vault kv put airflow/variables/my_var value=hello
 ```
