@@ -13,7 +13,6 @@ ENV AIRFLOW_HOME=/usr/local/airflow
 RUN sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt bullseye-pgdg 16" > /etc/apt/sources.list.d/pgdg.list'
 RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
 RUN apt-get -y update && apt-get -y install postgresql-client patch
-RUN wget https://nodejs.org/dist/v18.12.1/node-v18.12.1-linux-arm64.tar.xz
 RUN pip install apache-airflow
 RUN pip install -r requirements.txt
 ENV AIRFLOW__CORE__FERNET_KEY={1}
