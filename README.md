@@ -5,7 +5,9 @@ Simple python script for local airflow deployment with docker. Added components 
 - hashicorp vault for secrets backend
 - vscode server for ide
 
-Will be adding more going forward
+Will be adding more going forward.
+
+>NOTE: Not for Windows! But can work in WSL liunx.
 
 ## Usage
 
