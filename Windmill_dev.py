@@ -1,4 +1,4 @@
-import os, sys, stat, socket, subprocess, base64
+import os, sys, stat, socket, subprocess
 
 DOCKERFILE = """FROM python:3.9-bullseye
 RUN mkdir /usr/local/airflow
@@ -22,7 +22,7 @@ RUN cd airflow && python setup.py compile_assets
 RUN cd airflow && pip install .
 RUN rm -rf airflow
 RUN pip install -r requirements.txt
-ENV AIRFLOW__CORE__FERNET_KEY={1}
+ENV AIRFLOW__CORE__FERNET_KEY=hspWEGdpVbFQmUKyvlwz3y-STqB54lGM1oui4mRQupw=
 ENV AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://postgres:postgres@172.22.0.1:5432/{0}
 ENV AIRFLOW__CORE__EXECUTOR=CeleryExecutor
 ENV AIRFLOW__WEBSERVER__RBAC=True
@@ -50,8 +50,9 @@ ENV AIRFLOW__SMTP__SMTP_SSL=False
 ENV AIRFLOW__SMTP__SMTP_MAIL_FROM="airflow@{0}.com"
 ENV AIRFLOW__SECRETS__BACKEND=airflow.providers.hashicorp.secrets.vault.VaultBackend
 ENV AIRFLOW__SECRETS__BACKEND_KWARGS='{{"connections_path": "connections", "variables_path": "variables","config_path": "config", "mount_point": "airflow", "url": "http://172.22.0.1:8200", "token":"hvs.AlFE0WHKbruiBstNQURhQqz2"}}'
-# ENV AIRFLOW__DATABASE__SQL_ALCHEMY_CONN_SECRET=sql_alchemy_conn_value2
-# ENV AIRFLOW__WEBSERVER__SECRET_KEY_SECRET=web_server_secret
+ENV AIRFLOW__LINEAGE__BACKEND=openlineage.lineage_backend.OpenLineageBackend
+ENV OPENLINEAGE_URL=http://172.22.0.1:5000
+ENV OPENLINEAGE_NAMESPACE="{0}"
 """
 
 LOGDOCKERFILE = """FROM opensearchproject/logstash-oss-with-opensearch-output-plugin:latest
@@ -100,6 +101,7 @@ apache-airflow-providers-hashicorp
 psycopg2
 apache-airflow-providers-celery
 redis
+openlineage-airflow
 """
 
 COMPOSE = """version: "3.8"
@@ -326,6 +328,7 @@ echo "Flower: http://localhost:5555"
 echo "IDE: http://localhost:6666"
 echo "Vault: http://localhost:8200"
 echo "Opensearch: http://localhost:5601/app/home#/"
+echo "Marquez: http://localhost:3000/"
 """
 
 STOP = """docker-compose down"""
@@ -393,7 +396,7 @@ FARMCOMPOSE = """services:
     environment:
       VAULT_ADDR: http://127.0.0.1:8200
       # This token needs to be generated when spinning up first time if need to execute vault cli
-      VAULT_TOKEN: hvs.AlFE0WHKbruiBstNQURhQqz2
+      VAULT_TOKEN: hvs.3A6OCnFe7wO474PZsOZZyZZi
       VAULT_DEV_ROOT_TOKEN_ID: myroot
       VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
       VAULT_LOCAL_CONFIG={"backend": '{"file": {"path": "/vault/file"}}'
@@ -418,7 +421,7 @@ FARMCOMPOSE = """services:
     command: sendria --db mails.sqlite --smtp-ip=0.0.0.0 --http-ip=0.0.0.0
   opensearch-node1:
     image: opensearchproject/opensearch:latest
-    container_name: opensearch-node1
+    hostname: opensearch-node1
     environment:
       - cluster.name=opensearch-cluster # Name the cluster
       - node.name=opensearch-node1 # Name the node that will run in this container
@@ -445,7 +448,7 @@ FARMCOMPOSE = """services:
         ipv4_address: 172.22.0.6
   opensearch-node2:
     image: opensearchproject/opensearch:latest
-    container_name: opensearch-node2
+    hostname: opensearch-node2
     environment:
       - cluster.name=opensearch-cluster # Name the cluster
       - node.name=opensearch-node2 # Name the node that will run in this container
@@ -469,7 +472,7 @@ FARMCOMPOSE = """services:
         ipv4_address: 172.22.0.7
   opensearch-dashboards:
     image: opensearchproject/opensearch-dashboards:latest
-    container_name: opensearch-dashboards
+    hostname: opensearch-dashboards
     ports:
       - 5601:5601
     expose:
@@ -480,16 +483,113 @@ FARMCOMPOSE = """services:
     networks:
       farm:
         ipv4_address: 172.22.0.8
+  lineageapi:
+    image: "marquezproject/marquez:latest"
+    hostname: marquez-api
+    environment:
+      - MARQUEZ_PORT=5000
+      - MARQUEZ_ADMIN_PORT=5001
+      - POSTGRES_HOST=172.22.0.1
+      - POSTGRES_PORT=5434
+      - POSTGRES_DB=marquez
+      - POSTGRES_USER=marquez
+      - POSTGRES_PASSWORD=marquez
+    ports:
+      - "5000:5000"
+      - "5001:5001"
+    volumes:
+      - utils:/opt/marquez
+      - ./marquez.dev.yml:/usr/src/app/marquez.dev.yml
+    depends_on:
+      - lineagedb
+    entrypoint: ["./entrypoint.sh"]
+    networks:
+      farm:
+        ipv4_address: 172.22.0.9
+  lineageweb:
+    image: "marquezproject/marquez-web:latest"
+    hostname: marquez-web
+    environment:
+      - MARQUEZ_HOST=172.22.0.1
+      - MARQUEZ_PORT=5000
+    ports:
+      - "3000:3000"
+    stdin_open: true
+    tty: true
+    depends_on:
+      - lineageapi
+    networks:
+      farm:
+        ipv4_address: 172.22.0.10
+  lineagedb:
+    image: postgres:12.1
+    hostname: marquez-db
+    ports:
+      - "5434:5432"
+    environment:
+      - POSTGRES_DB=marquez
+      - POSTGRES_USER=marquez
+      - POSTGRES_PASSWORD=marquez
+    volumes:
+      - ./postgresql.conf:/etc/postgresql/postgresql.conf
+      - marq_pg:/var/lib/postgresql/data:rw
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
+    networks:
+      farm:
+        ipv4_address: 172.22.0.11
+    
 version: '3.8'
 volumes:
   pg_data:
   opensearch-data1:
   opensearch-data2:
   vault_db:
+  utils:
+  marq_pg:
 
 networks:
   farm:
     external: true
+"""
+
+MARQUEZCONF = """server:
+  applicationConnectors:
+  - type: http
+    port: ${MARQUEZ_PORT:-5000}
+    httpCompliance: RFC7230_LEGACY
+  adminConnectors:
+  - type: http
+    port: ${MARQUEZ_ADMIN_PORT:-5001}
+
+db:
+  driverClass: org.postgresql.Driver
+  url: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+  user: ${POSTGRES_USER}
+  password: ${POSTGRES_PASSWORD}
+
+migrateOnStartup: true
+
+graphql:
+  enabled: true
+
+logging:
+  level: DEBUG
+  appenders:
+    - type: console
+
+tags:
+  - name: PII
+    description: Personally identifiable information
+  - name: SENSITIVE
+    description: Contains sensitive information
+"""
+
+MARQUEZPOSTGRESCONF = """shared_preload_libraries = 'pg_stat_statements'
+pg_stat_statements.track = all
+pg_stat_statements.max = 10000
+track_activity_query_size = 2048
+
+listen_addresses = '*'
 """
 
 FARMSMTPDOCKER = """FROM python:3.9
@@ -521,6 +621,10 @@ def get_or_create_farm():
             f.write(FARMSMTPDOCKER)
         with open(os.path.join(farm, "docker-compose.yml"), "w") as f:
             f.write(FARMCOMPOSE)
+        with open(os.path.join(farm, "marquez.dev.yml"), "w") as f:
+            f.write(MARQUEZCONF)
+        with open(os.path.join(farm, "postgresql.conf"), "w") as f:
+            f.write(MARQUEZPOSTGRESCONF)
         os.chmod(
             os.path.join(farm, "start.sh"), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO
         )
@@ -571,9 +675,7 @@ def create_folder_and_copy_utils(folder_name):
         print("The folder already exists!")
         sys.exit()
     with open(os.path.join(folder_name, "Dockerfile"), "w") as f:
-        key = "{} is a local dev project, Do not use in production.".format(folder_name)
-        fernet = base64.b64encode(key.encode("ascii")).decode("ascii")
-        f.write(DOCKERFILE.format(folder_name, fernet))
+        f.write(DOCKERFILE.format(folder_name))
     with open(os.path.join(folder_name, "packages.txt"), "w") as f:
         f.write(PACKAGES)
     with open(os.path.join(folder_name, "docker-compose.yaml"), "w") as f:

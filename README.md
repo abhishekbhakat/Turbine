@@ -8,6 +8,7 @@ Simple python script for local airflow deployment with docker. Added components 
 Will be adding more going forward.
 
 >NOTE: Not for Windows! But can work in WSL liunx.
+>NOTE: Multiple Airflows do not work as redis is configured default to 16 databases. And different airflow deployments are not using different dbs at the moment. Look for future commits.
 
 ## Usage
 
@@ -40,6 +41,7 @@ Airflow Swagger: http://localhost:8082/api/v1/ui/
 Flower: http://localhost:5557
 Vault: http://localhost:8200
 Opensearch: http://localhost:5601/app/home#/
+Marquez: http://localhost:3000/
 ```
 
 Logs for deployment are collected in `start.log`.
