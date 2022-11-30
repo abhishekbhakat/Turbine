@@ -248,7 +248,7 @@ services:
       - plugins:/usr/local/airflow/plugins
       - include:/usr/local/airflow/include
     ports:
-      - "6666:6666"
+      - "7000:7000"
     restart: always
     networks:
       farm:
@@ -325,7 +325,7 @@ echo "Deployed:"
 echo "Airflow: http://localhost:8080"
 echo "Airflow Swagger: http://localhost:8080/api/v1/ui/"
 echo "Flower: http://localhost:5555"
-echo "IDE: http://localhost:6666"
+echo "IDE: http://localhost:7000"
 echo "Vault: http://localhost:8200"
 echo "Opensearch: http://localhost:5601/app/home#/"
 echo "Marquez: http://localhost:3000/"
@@ -603,7 +603,7 @@ RUN mkdir /usr/local/airflow && chmod -R 766 /usr/local/airflow
 RUN mkdir -p .config/code-server
 ARG DEFAULT_WORKSPACE=/usr/local/airflow
 ENV PASSWORD=admin
-ENTRYPOINT ["/usr/bin/code-server","--bind-addr","0.0.0.0:6666","--disable-telemetry","--auth","password","/usr/local/airflow"]"""
+ENTRYPOINT ["/usr/bin/code-server","--bind-addr","0.0.0.0:7000","--disable-telemetry","--auth","password","/usr/local/airflow"]"""
 
 
 def get_or_create_farm():
@@ -657,7 +657,7 @@ def get_network():
 def create_folder_and_copy_utils(folder_name):
     web_p = porter(8080)
     flower_p = porter(5555)
-    code_p = porter(6666)
+    code_p = porter(7000)
     network = get_network()
     print(
         "Using port {} for webserver, {} for flower and {} for IDE".format(
@@ -683,7 +683,7 @@ def create_folder_and_copy_utils(folder_name):
             COMPOSE.format(folder_name, "${PWD}")
             .replace("8080:8080", str(web_p) + ":8080")
             .replace("5555:5555", str(flower_p) + ":5555")
-            .replace("6666:6666", str(code_p) + ":6666")
+            .replace("7000:7000", str(code_p) + ":" + str(code_p))
         )
         draft = draft.replace("172.22.0", network)
         f.write(draft)
@@ -692,7 +692,7 @@ def create_folder_and_copy_utils(folder_name):
             START.format(folder_name)
             .replace("8080", str(web_p))
             .replace("5555", str(flower_p))
-            .replace("6666", str(code_p))
+            .replace("7000", str(code_p))
         )
     with open(os.path.join(folder_name, "stop.sh"), "w") as f:
         f.write(STOP)
@@ -705,7 +705,7 @@ def create_folder_and_copy_utils(folder_name):
     with open(os.path.join(folder_name, "requirements.txt"), "w") as f:
         f.write(REQUIREMENTS)
     with open(os.path.join(folder_name, "code.Dockerfile"), "w") as f:
-        f.write(CODEDOCKERFILE.replace("6666", str(code_p)))
+        f.write(CODEDOCKERFILE.replace("7000", str(code_p)))
     os.chmod(
         os.path.join(folder_name, "start.sh"),
         stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO,

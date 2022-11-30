@@ -4,6 +4,7 @@ Simple python script for local airflow deployment with docker. Added components 
 - smtp server for email alerts
 - hashicorp vault for secrets backend
 - vscode server for ide
+- marquez for lineage
 
 Will be adding more going forward.
 
