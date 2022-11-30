@@ -623,7 +623,25 @@ def get_or_create_farm():
         )
         print("New farm created using network as 172.22.0.1/16!")
     else:
-        print("Existing farm found!")
+        print("Updating farm...")
+        with open(os.path.join(farm, "vault.Dockerfile"), "w") as f:
+            f.write(VAULTDOCKER.format(farm))
+        with open(os.path.join(farm, "vault.json"), "w") as f:
+            f.write(VAULTJSON)
+        with open(os.path.join(farm, "start.sh"), "w") as f:
+            f.write(FARMSTART)
+        with open(os.path.join(farm, "smtp.Dockerfile"), "w") as f:
+            f.write(FARMSMTPDOCKER)
+        with open(os.path.join(farm, "docker-compose.yml"), "w") as f:
+            f.write(FARMCOMPOSE)
+        with open(os.path.join(farm, "marquez.dev.yml"), "w") as f:
+            f.write(MARQUEZCONF)
+        with open(os.path.join(farm, "postgresql.conf"), "w") as f:
+            f.write(MARQUEZPOSTGRESCONF)
+        os.chmod(
+            os.path.join(farm, "start.sh"), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO
+        )
+        print("Updated farm using network as 172.22.0.1/16!")
 
 
 def porter(init):
