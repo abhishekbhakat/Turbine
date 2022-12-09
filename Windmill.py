@@ -288,7 +288,8 @@ docker-compose ls | grep farm > start.log 2>&1
 if [ $? -ne 0 ]
 then 
     echo "Farm doesn't exist. Creating..."
-    cd ../farm && ./start.sh
+    docker network create -d bridge --gateway 172.22.0.1 --subnet 172.22.0.1/16 farm ;
+    docker-compose  -f ../farm/docker-compose.yml up -d
 fi
 echo "Cleaning older deployment..."
 docker-compose down >> start.log 2>&1  
@@ -353,7 +354,7 @@ VAULTJSON = """{
 }
 """
 
-FARMSTART = """docker network create -d bridge --gateway 172.22.0.1 --subnet 172.22.0.1/16 farm
+FARMSTART = """docker network create -d bridge --gateway 172.22.0.1 --subnet 172.22.0.1/16 farm ;
 docker-compose up -d
 """
 
