@@ -66,7 +66,7 @@ input {
 output {
   opensearch {
     hosts => ["172.22.0.1:9200"]
-    index => "{0}-%{+YYYY.MM.dd}"
+    index => "filebeat-%{+YYYY.MM.dd}"
     user => "admin"
     password => "admin"
     ssl => false
