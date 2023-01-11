@@ -66,13 +66,42 @@ USER logstash
 LOGCONF = """# logstash.conf
 input {
   file {
-    path => ["/usr/local/airflow/logs/*/*/*/*.log"]
-    codec => "json"
+    path => [
+      "/usr/local/airflow/logs/*/*/*/*.log"
+    ]
+    codec => multiline {
+          pattern => "^\[\\  x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]"
+          negate => true
+          what => "previous"
+    }
+  }
+}
+filter {
+  if [log][file][path] {
+    dissect {
+      mapping => {
+       "[log][file][path]" => "/usr/local/airflow/logs/dag_id=%{dag_id}/run_id=%{run_id}/task_id=%{task_id}/attempt=%{attempt}.log"
+      }
+    }
+  }
+  mutate {
+    add_field => {
+      "log_id" => "%{dag_id}-%{task_id}-%{run_id}--1-%{attempt}"
+    }
+  }
+  mutate {
+    gsub => [
+      "message", "\[\\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]", "",
+      "message", "\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]\]?", "",
+      "message", "\\\\e",""
+    ]
   }
 }
 output {
   opensearch {
-    hosts => ["172.22.0.1:9200"]
+    hosts => [
+      "172.22.0.1:9200"
+    ]
     index => "filebeat-%{+YYYY.MM.dd}"
     user => "admin"
     password => "admin"
