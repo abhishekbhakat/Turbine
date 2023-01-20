@@ -89,6 +89,12 @@ filter {
       "message", "\\\\e",""
     ]
   }
+  ruby {
+      code => '
+          time = Time.now
+          event.set("offset", time.to_i * (10 ** 9) + time.nsec)
+      '
+  }
 }
 output {
   opensearch {
