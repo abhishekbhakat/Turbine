@@ -25,9 +25,10 @@ ENV AIRFLOW__ELASTICSEARCH__FRONTEND="http://localhost:5601/app/kibana#/discover
 ENV AIRFLOW__ELASTICSEARCH__HOST=admin:admin@172.22.0.1:9200
 ENV AIRFLOW__ELASTICSEARCH_CONFIGS__USE_SSL=False
 ENV AIRFLOW__ELASTICSEARCH_CONFIGS__VERIFY_CERTS=False
-ENV AIRFLOW__ELASTICSEARCH__JSON_FORMAT=True
+ENV AIRFLOW__ELASTICSEARCH__JSON_FORMAT=False
 ENV AIRFLOW__ELASTICSEARCH__HOST_FIELD=host.name
 ENV AIRFLOW__ELASTICSEARCH__OFFSET_FIELD=offset
+ENV AIRFLOW__ELASTICSEARCH__LOG_ID_TEMPLATE='{{dag_id}}-{{task_id}}-{{run_id}}-{{map_index}}-{{try_number}}'
 ENV AIRFLOW__CORE__LOAD_EXAMPLES=False
 ENV AIRFLOW__DATABASE__LOAD_DEFAULT_CONNECTIONS=False
 ENV AIRFLOW__CELERY__BROKER_URL=redis://172.22.0.1:6379/1
@@ -62,7 +63,7 @@ input {
       "/usr/local/airflow/logs/*/*/*/*.log"
     ]
     codec => multiline {
-          pattern => "^\[\\  x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]"
+          pattern => "^\[[0-9\-T\:\.\+]+\]"
           negate => true
           what => "previous"
     }
