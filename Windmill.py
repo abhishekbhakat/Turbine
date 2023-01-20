@@ -295,6 +295,11 @@ volumes:
       o: bind
       type: none
       device: {1}/include
+  sincedb:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
 
 networks:
   farm:
@@ -402,7 +407,9 @@ FARMCOMPOSE = """services:
     volumes:
       - pg_data:/var/lib/postgresql/data:rw
   redis:
-    image: redis:6-bullseye
+    build:
+      context: .
+      dockerfile: redis.Dockerfile
     environment:
       REDIS_PORT_6379_TCP_ADDR: redis
       REDIS_PORT_6379_TCP_PORT: 6379
@@ -628,6 +635,10 @@ ARG DEFAULT_WORKSPACE=/usr/local/airflow
 ENV PASSWORD=admin
 ENTRYPOINT ["/usr/bin/code-server","--bind-addr","0.0.0.0:7000","--disable-telemetry","--auth","password","/usr/local/airflow"]"""
 
+REDISDOCKERFILE = """FROM redis:latest
+RUN mkdir /usr/local/etc/redis
+RUN echo "databases 1000" >> /usr/local/etc/redis/redis.conf
+CMD [ "redis-server", "/usr/local/etc/redis/redis.conf" ]"""
 
 def get_or_create_farm():
     farm = "farm"
@@ -648,6 +659,8 @@ def get_or_create_farm():
             f.write(MARQUEZCONF)
         with open(os.path.join(farm, "postgresql.conf"), "w") as f:
             f.write(MARQUEZPOSTGRESCONF)
+        with open(os.path.join(farm, "redis.Dockerfile"), "w") as f:
+            f.write(REDISDOCKERFILE)
         os.chmod(
             os.path.join(farm, "start.sh"), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO
         )
