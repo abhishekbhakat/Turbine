@@ -709,9 +709,7 @@ def get_or_create_cache(tgt_folder):
         airflows = {}
         with open(".cache", "w") as f:
             json.dump(airflows, f)
-    if tgt_folder in airflows:
-        return airflows[tgt_folder]
-    return None
+    return airflows.get(tgt_folder, None)
 
 
 def porter(init):
@@ -726,34 +724,27 @@ def porter(init):
 
 
 def get_network():
+    cmd = "grep -rl '172.22.{}' *"
     for i in range(255):
-        cmd = "grep -rl '172.22.{}' *"
         res = subprocess.Popen([cmd.format(i)], shell=True, stdout=subprocess.DEVNULL)
         res.communicate()
         if res.returncode == 1:
             break
-    return "172.22.{}".format(i)
+    return f"172.22.{i}"
 
 
 def get_redis():
     with open(".cache", "r") as f:
         airflows = json.load(f)
-    used_redisdbs = set()
-    for folder in airflows:
-        used_redisdbs.add(airflows[folder]["redisdb"])
-    for i in range(1000):
-        if i not in used_redisdbs:
-            return i
-    return 0
+    used_redisdbs = {airflows[folder]["redisdb"] for folder in airflows}
+    return next((i for i in range(1000) if i not in used_redisdbs), 0)
 
 
 def get_webserver():
     with open(".cache", "r") as f:
         airflows = json.load(f)
-    used_webserver = set()
-    for folder in airflows:
-        used_webserver.add(airflows[folder]["webserver"])
-    if len(used_webserver) == 0:
+    used_webserver = {airflows[folder]["webserver"] for folder in airflows}
+    if not used_webserver:
         used_webserver.add(0)
     return porter(max(8080, max(used_webserver) + 1))
 
@@ -761,10 +752,8 @@ def get_webserver():
 def get_flower():
     with open(".cache", "r") as f:
         airflows = json.load(f)
-    used_flower = set()
-    for folder in airflows:
-        used_flower.add(airflows[folder]["flower"])
-    if len(used_flower) == 0:
+    used_flower = {airflows[folder]["flower"] for folder in airflows}
+    if not used_flower:
         used_flower.add(0)
     return porter(max(5555, max(used_flower) + 1))
 
@@ -772,10 +761,8 @@ def get_flower():
 def get_code():
     with open(".cache", "r") as f:
         airflows = json.load(f)
-    used_code = set()
-    for folder in airflows:
-        used_code.add(airflows[folder]["code"])
-    if len(used_code) == 0:
+    used_code = {airflows[folder]["code"] for folder in airflows}
+    if not used_code:
         used_code.add(0)
     return porter(max(7000, max(used_code) + 1))
 
@@ -787,11 +774,9 @@ def create_folder_and_copy_utils(folder_name):
     network = get_network()
     redisdb = get_redis()
     print(
-        "Using port {} for webserver, {} for flower, {} for IDE and {} for redis".format(
-            str(web_p), str(flower_p), str(code_p), str(redisdb)
+        f"Using port {str(web_p)} for webserver, {str(flower_p)} for flower, {str(code_p)} for IDE and {str(redisdb)} for redis"
         )
-    )
-    print("Using network: " + network + ".1")
+    print(f"Using network: {network}.1")
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
         os.system(f"cd {folder_name} && astro dev init")
@@ -805,9 +790,9 @@ def create_folder_and_copy_utils(folder_name):
     with open(os.path.join(folder_name, "docker-compose.yaml"), "w") as f:
         draft = (
             COMPOSE.format(folder_name, "${PWD}")
-            .replace("8080:8080", str(web_p) + ":8080")
-            .replace("5555:5555", str(flower_p) + ":5555")
-            .replace("7000:7000", str(code_p) + ":" + str(code_p))
+            .replace("8080:8080", f"{str(web_p)}:8080")
+            .replace("5555:5555", f"{str(flower_p)}:5555")
+            .replace("7000:7000", f"{str(code_p)}:{str(code_p)}")
         )
         draft = draft.replace("172.22.0", network)
         f.write(draft)
