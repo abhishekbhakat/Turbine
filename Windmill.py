@@ -789,8 +789,8 @@ def create_folder_and_copy_utils(folder_name):
     network = get_network()
     redisdb = get_redis()
     print(
-        "Using port {} for webserver, {} for flower and {} for IDE".format(
-            str(web_p), str(flower_p), str(code_p)
+        "Using port {} for webserver, {} for flower, {} for IDE and {} for redis".format(
+            str(web_p), str(flower_p), str(code_p), str(redisdb)
         )
     )
     print("Using network: " + network + ".1")
