@@ -1,4 +1,4 @@
-import os, sys, stat, socket, subprocess
+import os, sys, stat, socket, subprocess, json, shutil
 
 DOCKERFILE = """FROM python:3.9-bullseye
 RUN mkdir /usr/local/airflow
@@ -39,7 +39,7 @@ ENV AIRFLOW__ELASTICSEARCH__OFFSET_FIELD=offset
 ENV AIRFLOW__ELASTICSEARCH__LOG_ID_TEMPLATE='{{dag_id}}-{{task_id}}-{{run_id}}-{{map_index}}-{{try_number}}'
 ENV AIRFLOW__CORE__LOAD_EXAMPLES=False
 ENV AIRFLOW__DATABASE__LOAD_DEFAULT_CONNECTIONS=False
-ENV AIRFLOW__CELERY__BROKER_URL=redis://172.22.0.1:6379/1
+ENV AIRFLOW__CELERY__BROKER_URL=redis://172.22.0.1:6379/{1}
 ENV AIRFLOW__CELERY__RESULT_BACKEND="db+postgresql://postgres:postgres@172.22.0.1:5432/{0}"
 ENV AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth
 ENV AIRFLOW__CORE__HIDE_SENSITIVE_VAR_CONN_FIELDS=False
@@ -654,6 +654,7 @@ RUN mkdir /usr/local/etc/redis
 RUN echo "databases 1000" >> /usr/local/etc/redis/redis.conf
 CMD [ "redis-server", "/usr/local/etc/redis/redis.conf" ]"""
 
+
 def get_or_create_farm():
     farm = "farm"
     if not os.path.exists(farm):
@@ -701,6 +702,28 @@ def get_or_create_farm():
         print("Updated farm using network as 172.22.0.1/16!")
 
 
+def update_cache(airflow: dict):
+    airflow["type"] = "oss_dev"
+    with open(".cache", "r") as f:
+        airflows = json.load(f)
+    airflows[tgt_folder] = airflow
+    with open(".cache", "w") as f:
+        json.dump(airflows, f, indent=4)
+
+
+def get_or_create_cache(tgt_folder):
+    try:
+        with open(".cache", "r") as f:
+            airflows = json.load(f)
+    except FileNotFoundError:
+        airflows = {}
+        with open(".cache", "w") as f:
+            json.dump(airflows, f)
+    if tgt_folder in airflows:
+        return airflows[tgt_folder]
+    return None
+
+
 def porter(init):
     result = 1
     for i in range(init, 65535):
@@ -722,11 +745,57 @@ def get_network():
     return "172.22.{}".format(i)
 
 
+def get_redis():
+    with open(".cache", "r") as f:
+        airflows = json.load(f)
+    used_redisdbs = set()
+    for folder in airflows:
+        used_redisdbs.add(airflows[folder]["redisdb"])
+    for i in range(1000):
+        if i not in used_redisdbs:
+            return i
+    return 0
+
+
+def get_webserver():
+    with open(".cache", "r") as f:
+        airflows = json.load(f)
+    used_webserver = set()
+    for folder in airflows:
+        used_webserver.add(airflows[folder]["webserver"])
+    if len(used_webserver) == 0:
+        used_webserver.add(0)
+    return porter(max(8080, max(used_webserver) + 1))
+
+
+def get_flower():
+    with open(".cache", "r") as f:
+        airflows = json.load(f)
+    used_flower = set()
+    for folder in airflows:
+        used_flower.add(airflows[folder]["flower"])
+    if len(used_flower) == 0:
+        used_flower.add(0)
+    return porter(max(5555, max(used_flower) + 1))
+
+
+def get_code():
+    with open(".cache", "r") as f:
+        airflows = json.load(f)
+    used_code = set()
+    for folder in airflows:
+        used_code.add(airflows[folder]["code"])
+    if len(used_code) == 0:
+        used_code.add(0)
+    return porter(max(7000, max(used_code) + 1))
+
+
 def create_folder_and_copy_utils(folder_name):
-    web_p = porter(8080)
-    flower_p = porter(5555)
-    code_p = porter(7000)
+    web_p = get_webserver()
+    flower_p = get_flower()
+    code_p = get_code()
     network = get_network()
+    redisdb = get_redis()
     print(
         "Using port {} for webserver, {} for flower and {} for IDE".format(
             str(web_p), str(flower_p), str(code_p)
@@ -743,7 +812,7 @@ def create_folder_and_copy_utils(folder_name):
         print("The folder already exists!")
         sys.exit()
     with open(os.path.join(folder_name, "Dockerfile"), "w") as f:
-        f.write(DOCKERFILE.format(folder_name))
+        f.write(DOCKERFILE.format(folder_name, redisdb))
     with open(os.path.join(folder_name, "packages.txt"), "w") as f:
         f.write(PACKAGES)
     with open(os.path.join(folder_name, "docker-compose.yaml"), "w") as f:
@@ -785,11 +854,30 @@ def create_folder_and_copy_utils(folder_name):
         os.path.join(folder_name, "clean.sh"),
         stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO,
     )
+    airflow = {}
+    airflow["webserver"] = web_p
+    airflow["flower"] = flower_p
+    airflow["code"] = code_p
+    airflow["network"] = network
+    airflow["redisdb"] = redisdb
+    return airflow
+
+
+def force_create_folder_and_copy_utils(folder_name):
+    if os.path.exists(folder_name):
+        shutil.rmtree(folder_name)
+    airflow = create_folder_and_copy_utils(folder_name)
+    update_cache(airflow)
 
 
 get_or_create_farm()
 tgt_folder = input("Folder name: ")
-create_folder_and_copy_utils(tgt_folder)
-
-# Make sure network 172.22.0.1 is not being used. Or else change all occurence of 172.22 with a suitable network address.
-# Create project only when running all other Airflows else it could cause port reusage
+if not get_or_create_cache(tgt_folder):
+    airflow = create_folder_and_copy_utils(tgt_folder)
+    update_cache(airflow)
+else:
+    choice = input("Name already used, overwrite [yN] :")
+    if choice.lower()[0] == "y":
+        force_create_folder_and_copy_utils(tgt_folder)
+    else:
+        sys.exit()
