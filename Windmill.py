@@ -242,7 +242,6 @@ services:
       - plugins:/usr/local/airflow/plugins
       - include:/usr/local/airflow/include
     command: sleep infinity
-    restart: always
     networks:
       farm:
         ipv4_address: "172.22.0.109"
@@ -277,7 +276,6 @@ services:
       - include:/usr/local/airflow/include
     ports:
       - "7000:7000"
-    restart: always
     networks:
       farm:
         ipv4_address: "172.22.0.111"
