@@ -272,21 +272,21 @@ services:
     networks:
       farm:
         ipv4_address: "172.22.0.110"
-  code:
-    hostname: code
-    build:
-      context: .
-      dockerfile: code.Dockerfile
-    volumes:
-      - dags:/usr/local/airflow/dags
-      - logs:/usr/local/airflow/logs
-      - plugins:/usr/local/airflow/plugins
-      - include:/usr/local/airflow/include
-    ports:
-      - "7000:7000"
-    networks:
-      farm:
-        ipv4_address: "172.22.0.111"
+  # code:
+  #   hostname: code
+  #   build:
+  #     context: .
+  #     dockerfile: code.Dockerfile
+  #   volumes:
+  #     - dags:/usr/local/airflow/dags
+  #     - logs:/usr/local/airflow/logs
+  #     - plugins:/usr/local/airflow/plugins
+  #     - include:/usr/local/airflow/include
+  #   ports:
+  #     - "7000:7000"
+  #   networks:
+  #     farm:
+  #       ipv4_address: "172.22.0.111"
 volumes:
   dags:
     driver: local
@@ -732,13 +732,12 @@ def porter(init):
 
 
 def get_network():
-    cmd = "grep -rl '172.22.{}' *"
-    for i in range(255):
-        res = subprocess.Popen([cmd.format(i)], shell=True, stdout=subprocess.DEVNULL)
-        res.communicate()
-        if res.returncode == 1:
-            break
-    return f"172.22.{i}"
+    with open(".cache", "r") as f:
+        airflows = json.load(f)
+    used_network = {airflows[folder]["network"].split('.')[-1] for folder in airflows}
+    net = next((i for i in range(2,255) if str(i) not in used_network), 1)
+    return f"172.22.{net}"
+
 
 
 def get_redis():
@@ -824,8 +823,8 @@ def create_folder_and_copy_utils(folder_name):
         f.write(LOGCONF.replace("filebeat", folder_name))
     with open(os.path.join(folder_name, "requirements.txt"), "w") as f:
         f.write(REQUIREMENTS)
-    with open(os.path.join(folder_name, "code.Dockerfile"), "w") as f:
-        f.write(CODEDOCKERFILE.replace("7000", str(code_p)))
+    # with open(os.path.join(folder_name, "code.Dockerfile"), "w") as f:
+    #     f.write(CODEDOCKERFILE.replace("7000", str(code_p)))
     os.chmod(
         os.path.join(folder_name, "start.sh"),
         stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO,

@@ -722,13 +722,12 @@ def porter(init):
 
 
 def get_network():
-    cmd = "grep -rl '172.22.{}' *"
-    for i in range(255):
-        res = subprocess.Popen([cmd.format(i)], shell=True, stdout=subprocess.DEVNULL)
-        res.communicate()
-        if res.returncode == 1:
-            break
-    return f"172.22.{i}"
+    with open(".cache", "r") as f:
+        airflows = json.load(f)
+    used_network = {airflows[folder]["network"].split('.')[-1] for folder in airflows}
+    net = next((i for i in range(2,255) if str(i) not in used_network), 1)
+    return f"172.22.{net}"
+
 
 
 def get_redis():
@@ -824,13 +823,13 @@ def create_folder_and_copy_utils(folder_name):
         os.path.join(folder_name, "clean.sh"),
         stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO,
     )
-    airflow = {}
-    airflow["webserver"] = web_p
-    airflow["flower"] = flower_p
-    airflow["code"] = code_p
-    airflow["network"] = network
-    airflow["redisdb"] = redisdb
-    return airflow
+    return {
+        "webserver": web_p,
+        "flower": flower_p,
+        "code": code_p,
+        "network": network,
+        "redisdb": redisdb,
+    }
 
 
 def force_create_folder_and_copy_utils(folder_name):
