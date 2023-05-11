@@ -15,11 +15,11 @@ RUN apt-get -y update && apt-get -y install postgresql-client patch
 RUN pip install apache-airflow
 RUN pip install -r requirements.txt
 ENV AIRFLOW__CORE__FERNET_KEY=hspWEGdpVbFQmUKyvlwz3y-STqB54lGM1oui4mRQupw=
-ENV AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://postgres:postgres@172.22.0.1:5432/{0}
+ENV AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://postgres:postgres@172.22.0.1:5433/{0}
 ENV AIRFLOW__CORE__EXECUTOR=CeleryExecutor
 ENV AIRFLOW__WEBSERVER__RBAC=True
 ENV AIRFLOW__LOGGING__LOGGING_LEVEL=DEBUG
-ENV AIRFLOW__LOGGING__REMOTE_LOGGING=True
+ENV AIRFLOW__LOGGING__REMOTE_LOGGING={2}
 ENV AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER=
 ENV AIRFLOW__ELASTICSEARCH__FRONTEND="http://localhost:5601/app/kibana#/discover?_a=(columns:!(message),query:(language:kuery,query:'log_id: \"{{log_id}}\"'),sort:!(log.offset,asc))"
 ENV AIRFLOW__ELASTICSEARCH__HOST=admin:admin@172.22.0.1:9200
@@ -32,7 +32,7 @@ ENV AIRFLOW__ELASTICSEARCH__LOG_ID_TEMPLATE='{{dag_id}}-{{task_id}}-{{run_id}}-{
 ENV AIRFLOW__CORE__LOAD_EXAMPLES=False
 ENV AIRFLOW__DATABASE__LOAD_DEFAULT_CONNECTIONS=False
 ENV AIRFLOW__CELERY__BROKER_URL=redis://172.22.0.1:6379/{1}
-ENV AIRFLOW__CELERY__RESULT_BACKEND="db+postgresql://postgres:postgres@172.22.0.1:5432/{0}"
+ENV AIRFLOW__CELERY__RESULT_BACKEND="db+postgresql://postgres:postgres@172.22.0.1:5433/{0}"
 ENV AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth
 ENV AIRFLOW__CORE__HIDE_SENSITIVE_VAR_CONN_FIELDS=False
 ENV AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
@@ -41,7 +41,7 @@ ENV AIRFLOW__SMTP__SMTP_PORT=1025
 ENV AIRFLOW__SMTP__SMTP_STARTTLS=False
 ENV AIRFLOW__SMTP__SMTP_SSL=False
 ENV AIRFLOW__SMTP__SMTP_MAIL_FROM="airflow@{0}.com"
-ENV AIRFLOW__SECRETS__BACKEND=airflow.providers.hashicorp.secrets.vault.VaultBackend
+ENV AIRFLOW__SECRETS__BACKEND={3}
 ENV AIRFLOW__SECRETS__BACKEND_KWARGS='{{"connections_path": "connections", "variables_path": "variables","config_path": "config", "mount_point": "airflow", "url": "http://172.22.0.1:8200", "token":"hvs.AlFE0WHKbruiBstNQURhQqz2"}}'
 ENV AIRFLOW__LINEAGE__BACKEND=openlineage.lineage_backend.OpenLineageBackend
 ENV OPENLINEAGE_URL=http://172.22.0.1:5000
@@ -264,21 +264,7 @@ services:
     networks:
       farm:
         ipv4_address: "172.22.0.110"
-  # code:
-  #   hostname: code
-  #   build:
-  #     context: .
-  #     dockerfile: code.Dockerfile
-  #   volumes:
-  #     - dags:/usr/local/airflow/dags
-  #     - logs:/usr/local/airflow/logs
-  #     - plugins:/usr/local/airflow/plugins
-  #     - include:/usr/local/airflow/include
-  #   ports:
-  #     - "7000:7000"
-  #   networks:
-  #     farm:
-  #       ipv4_address: "172.22.0.111"
+  {2}
 volumes:
   dags:
     driver: local
@@ -321,6 +307,22 @@ networks:
             backup: "172.22.0.109"
       
       """
+COMPOSE_CODE = """code:
+    hostname: code
+    build:
+      context: .
+      dockerfile: code.Dockerfile
+    volumes:
+      - dags:/usr/local/airflow/dags
+      - logs:/usr/local/airflow/logs
+      - plugins:/usr/local/airflow/plugins
+      - include:/usr/local/airflow/include
+    ports:
+      - "7000:7000"
+    networks:
+      farm:
+        ipv4_address: "172.22.0.111"
+        """
 START = """echo "Deploying..."
 docker-compose ls | grep farm > start.log 2>&1  
 if [ $? -ne 0 ]
@@ -340,7 +342,7 @@ then
     exit 1
 fi
 echo "Preping db..."
-docker run -it --net farm -e PGPASSWORD=postgres {0}:latest psql -h 172.22.0.1 -U postgres -c 'CREATE DATABASE "{0}";' >> start.log 2>&1  
+docker run -it --net farm -e PGPASSWORD=postgres {0}:latest psql -h 172.22.0.1 -p 5433 -U postgres -c 'CREATE DATABASE "{0}";' >> start.log 2>&1  
 if [ $? -eq 0 ]
 then 
     docker run -it --net farm  {0}:latest airflow db init >> start.log 2>&1
@@ -404,7 +406,7 @@ FARMCOMPOSE = """services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
     ports:
-      - "5432:5432"
+      - "5433:5432"
     networks:
       farm:
         ipv4_address: 172.22.0.2
@@ -766,7 +768,7 @@ def get_code():
     return porter(max(7000, max(used_code) + 1))
 
 
-def create_folder_and_copy_utils(folder_name):
+def create_folder_and_copy_utils(folder_name, remote_login=False, vault=False, code_server=False):
     web_p = get_webserver()
     flower_p = get_flower()
     code_p = get_code()
@@ -786,12 +788,12 @@ def create_folder_and_copy_utils(folder_name):
         print("The folder already exists!")
         sys.exit()
     with open(os.path.join(folder_name, "Dockerfile"), "w") as f:
-        f.write(DOCKERFILE.format(folder_name, redisdb))
+        f.write(DOCKERFILE.format(folder_name, redisdb, str(remote_login), 'airflow.providers.hashicorp.secrets.vault.VaultBackend' if vault else ''))
     with open(os.path.join(folder_name, "packages.txt"), "w") as f:
         f.write(PACKAGES)
     with open(os.path.join(folder_name, "docker-compose.yaml"), "w") as f:
         draft = (
-            COMPOSE.format(folder_name, "${PWD}")
+            COMPOSE.format(folder_name, "${PWD}", COMPOSE_CODE if code_server else "")
             .replace("8080:8080", f"{str(web_p)}:8080")
             .replace("5555:5555", f"{str(flower_p)}:5555")
             .replace("7000:7000", f"{str(code_p)}:{str(code_p)}")
@@ -843,11 +845,17 @@ def force_create_folder_and_copy_utils(folder_name):
     airflow = create_folder_and_copy_utils(folder_name)
     update_cache(airflow)
 
+def true_like(s):
+    return s.lower()[0] == "y" if s else False
 
 get_or_create_farm()
-tgt_folder = input("Folder name: ")
+tgt_folder = input("Project name: ")
+tgt_folder += "_airflow_oss"
+REMOTE_LOGGING = true_like(input("Enable remote logging [yN]: "))
+VAULT = true_like(input("Enable vault [yN]: "))
+CODE_SERVER = true_like(input("Enable code server [yN]: "))
 if not get_or_create_cache(tgt_folder):
-    airflow = create_folder_and_copy_utils(tgt_folder)
+    airflow = create_folder_and_copy_utils(tgt_folder, REMOTE_LOGGING, VAULT, CODE_SERVER)
     update_cache(airflow)
 else:
     choice = input("Name already used, overwrite [yN] :")
