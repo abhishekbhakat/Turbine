@@ -21,3 +21,6 @@ provision:
 Related issues:
 - https://github.com/rancher-sandbox/rancher-desktop/issues/1209
 - https://github.com/runfinch/finch/issues/131
+
+Official Doc:
+- https://docs.rancherdesktop.io/how-to-guides/provisioning-scripts/
