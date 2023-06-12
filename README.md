@@ -1,4 +1,4 @@
-# Windmill
+# Turbine
 Simple python script for local airflow deployment with docker. Added components are 
 - elasticsearch logging
 - smtp server for email alerts
@@ -11,11 +11,11 @@ Will be adding more going forward.
 >NOTE: Not for Windows! But can work in WSL liunx.
 >NOTE: Dev branch is for aarch64 architecture.
 >NOTE: Code is commented for Astro.
->NOTE: Windmill astro needs [Astro-CLI](https://github.com/astronomer/astro-cli) installed.
+>NOTE: Turbine astro needs [Astro-CLI](https://github.com/astronomer/astro-cli) installed.
 ## Usage
 
 ```
-python Windmill.py
+python Turbine.py
 ```
 
 ### Sample output
