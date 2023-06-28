@@ -119,6 +119,7 @@ vim
 gnupg
 wget
 git
+libpq-dev
 """
 
 REQUIREMENTS = """apache-airflow-providers-elasticsearch

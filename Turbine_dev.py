@@ -1,6 +1,6 @@
 import os, sys, stat, socket, subprocess, json, shutil
 
-DOCKERFILE = """FROM python:3.9-bullseye
+DOCKERFILE = """FROM python:3.10-bullseye
 RUN mkdir /usr/local/airflow
 WORKDIR /usr/local/airflow
 COPY . .
@@ -130,6 +130,7 @@ vim
 gnupg
 wget
 git
+libpq-dev
 """
 
 REQUIREMENTS = """apache-airflow-providers-elasticsearch
