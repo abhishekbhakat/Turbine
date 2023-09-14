@@ -6,7 +6,7 @@ from templates import *
 # check if the cache file exists
 file_path = os.path.join(os.getcwd(), ".cache")
 if not os.path.exists(file_path):
-    print("Cache file not found!")
+    print(f"Cache file not found! {ANGRY}")
     exit()
 
 
@@ -51,14 +51,15 @@ def delete_proj(project):
 # list all the projects
 with open(file_path, "r") as f:
     airflows = json.load(f)
-    if len(airflows) == 0:
-        print(f"No projects found! {CONFUSED}")
-        exit()
-    print("Projects found:")
-    for id, airflow in enumerate(airflows):
-        print(f" {id+1}. {airflow}")
+    if len(airflows) > 0:
+        print("Projects found:")
+        for id, airflow in enumerate(airflows):
+            print(f" {id+1}. {airflow}")
+    else:
+        print(f"No projects found! {OOPS}")
 print(" 0. Exit")
 print("-1. Delete all projects")
+print("-2. Destroy everything")
 # ask for the project to delete
 choice = input("-> ")
 if choice in ["0", ""]:
@@ -68,9 +69,17 @@ try:
 except ValueError:
     print(f"Invalid choice! {ANGRY}")
     exit()
-if choice < -1 or choice > len(airflows):
+if choice < -2 or choice > len(airflows):
     print(f"Invalid choice! {ANGRY}")
     exit()
-if choice == -1:
+elif choice < 0:
     for project in airflows:
         delete_proj(project)
+    if choice < -1:
+        farm_path = os.path.join(os.getcwd(), 'farm')
+        if os.path.exists(file_path):
+            os.system(f"docker-compose -f {farm_path}/docker-compose.yaml down")
+            os.system(f"docker-compose -f {farm_path}/docker-compose.yaml down -v")
+            shutil.rmtree(farm_path)
+        os.remove('.cache')
+        print(f"Destroyed everything! {SAYONARA}")
