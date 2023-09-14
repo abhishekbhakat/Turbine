@@ -118,7 +118,7 @@ def get_code():
 
 
 def create_folder_and_copy_utils(
-    folder_name, remote_login=False, vault=False, code_server=False
+    folder_name, remote_login=False, vault=False, code_server=False, airflow_type="1"
 ):
     web_p = get_webserver()
     flower_p = get_flower()
@@ -131,7 +131,12 @@ def create_folder_and_copy_utils(
     print(f"Using network: {network}.1")
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
-        os.system(f"cd {folder_name} && astro dev init")
+        if airflow_type == "1":
+            os.system(f"cd {folder_name} && astro dev init")
+        else:
+            os.makedirs(os.path.join(folder_name, "dags"))
+            os.makedirs(os.path.join(folder_name, "logs"))
+            os.makedirs(os.path.join(folder_name, "plugins"))
     else:
         print("The folder already exists!")
         sys.exit()
@@ -228,7 +233,7 @@ VAULT = true_like(input("Enable vault [yN]: "))
 CODE_SERVER = true_like(input("Enable code server [yN]: "))
 if not get_or_create_cache(tgt_folder):
     airflow = create_folder_and_copy_utils(
-        tgt_folder, REMOTE_LOGGING, VAULT, CODE_SERVER
+        tgt_folder, REMOTE_LOGGING, VAULT, CODE_SERVER, airflow_type
     )
     update_cache(airflow, airflow_type_str)
 else:
