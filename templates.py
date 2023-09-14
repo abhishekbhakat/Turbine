@@ -1,6 +1,50 @@
-import os, sys, stat, socket, subprocess, json, shutil
-
-DOCKERFILE = """FROM python:3.10-bullseye
+ASTRO_DOCKERFILE = """
+USER root
+RUN sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt bullseye-pgdg 16" > /etc/apt/sources.list.d/pgdg.list'
+RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+RUN sudo apt-get -y update && sudo apt-get -y install postgresql-client patch
+USER astro
+ENV AIRFLOW__CORE__FERNET_KEY=hspWEGdpVbFQmUKyvlwz3y-STqB54lGM1oui4mRQupw=
+ENV AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://postgres:postgres@172.22.0.1:5433/{0}
+ENV AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+ENV AIRFLOW__WEBSERVER__RBAC=True
+ENV AIRFLOW__LOGGING__LOGGING_LEVEL=DEBUG
+ENV AIRFLOW__LOGGING__REMOTE_LOGGING={2}
+ENV AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER=
+ENV AIRFLOW__ELASTICSEARCH__FRONTEND="http://localhost:5601/app/kibana#/discover?_a=(columns:!(message),query:(language:kuery,query:'log_id: \"{{log_id}}\"'),sort:!(log.offset,asc))"
+ENV AIRFLOW__ELASTICSEARCH__HOST=admin:admin@172.22.0.1:9200
+ENV AIRFLOW__ELASTICSEARCH_CONFIGS__USE_SSL=False
+ENV AIRFLOW__ELASTICSEARCH_CONFIGS__VERIFY_CERTS=False
+ENV AIRFLOW__ELASTICSEARCH__JSON_FORMAT=False
+ENV AIRFLOW__ELASTICSEARCH__HOST_FIELD=host.name
+ENV AIRFLOW__ELASTICSEARCH__OFFSET_FIELD=offset
+ENV AIRFLOW__ELASTICSEARCH__LOG_ID_TEMPLATE='{{dag_id}}-{{task_id}}-{{run_id}}-{{map_index}}-{{try_number}}'
+ENV AIRFLOW__CORE__LOAD_EXAMPLES=False
+ENV AIRFLOW__DATABASE__LOAD_DEFAULT_CONNECTIONS=False
+ENV AIRFLOW__CELERY__BROKER_URL=redis://172.22.0.1:6379/{1}
+ENV AIRFLOW__CELERY__RESULT_BACKEND="db+postgresql://postgres:postgres@172.22.0.1:5433/{0}"
+ENV AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth
+ENV AIRFLOW__CORE__HIDE_SENSITIVE_VAR_CONN_FIELDS=False
+ENV AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
+ENV AIRFLOW__SMTP__SMTP_HOST="172.22.0.1"
+ENV AIRFLOW__SMTP__SMTP_PORT=1025
+ENV AIRFLOW__SMTP__SMTP_STARTTLS=False
+ENV AIRFLOW__SMTP__SMTP_SSL=False
+ENV AIRFLOW__SMTP__SMTP_MAIL_FROM="airflow@{0}.com"
+ENV AIRFLOW__SECRETS__BACKEND={3}
+ENV AIRFLOW__SECRETS__BACKEND_KWARGS='{{"connections_path": "connections", "variables_path": "variables","config_path": "config", "mount_point": "airflow", "url": "http://172.22.0.1:8200", "token":"hvs.AlFE0WHKbruiBstNQURhQqz2"}}'
+# ENV AIRFLOW__DATABASE__SQL_ALCHEMY_CONN_SECRET=sql_alchemy_conn_value2
+# ENV AIRFLOW__WEBSERVER__SECRET_KEY_SECRET=web_server_secret
+ENV AIRFLOW__LINEAGE__BACKEND=openlineage.lineage_backend.OpenLineageBackend
+ENV OPENLINEAGE_URL=http://172.22.0.1:5000
+ENV OPENLINEAGE_NAMESPACE="{0}"
+ENV ASTRONOMER_RUNTIME_EXECUTOR=false
+ENV AIRFLOW__CORE__ENABLE_XCOM_PICKLING=True
+ENV AIRFLOW__CORE__SENSITIVE_VAR_CONN_NAMES=credential
+ENV AIRFLOW_CONN_MINIO_LOCAL='{{"conn_type": "aws", "extra": {{"aws_access_key_id": "minioadmin", "aws_secret_access_key": "minioadmin", "endpoint_url": "http://172.22.0.1:9000"}}}}'
+ENV AIRFLOW_CONN_AWS_DEFAULT=${{AIRFLOW_CONN_MINIO_LOCAL}}
+"""
+DEV_DOCKERFILE = """FROM python:3.10-bullseye
 RUN mkdir /usr/local/airflow
 WORKDIR /usr/local/airflow
 COPY . .
@@ -54,6 +98,62 @@ ENV AIRFLOW__SECRETS__BACKEND_KWARGS='{{"connections_path": "connections", "vari
 ENV AIRFLOW__LINEAGE__BACKEND=openlineage.lineage_backend.OpenLineageBackend
 ENV OPENLINEAGE_URL=http://172.22.0.1:5000
 ENV OPENLINEAGE_NAMESPACE="{0}"
+ENV AIRFLOW__CORE__ENABLE_XCOM_PICKLING=True
+ENV AIRFLOW__CORE__SENSITIVE_VAR_CONN_NAMES=credential
+ENV AIRFLOW_CONN_MINIO_LOCAL='{{"conn_type": "aws", "extra": {{"aws_access_key_id": "minioadmin", "aws_secret_access_key": "minioadmin", "endpoint_url": "http://172.22.0.1:9000"}}}}'
+ENV AIRFLOW_CONN_AWS_DEFAULT=${{AIRFLOW_CONN_MINIO_LOCAL}}
+"""
+
+OSS_DOCKERFILE = """FROM python:3.10-bullseye
+RUN mkdir /usr/local/airflow
+WORKDIR /usr/local/airflow
+COPY . .
+RUN apt-get update && cat packages.txt | xargs apt-get install -y --no-install-recommends \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*;
+RUN pip install wheel setuptools
+ENV AIRFLOW_HOME=/usr/local/airflow
+RUN sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt bullseye-pgdg 16" > /etc/apt/sources.list.d/pgdg.list'
+RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
+RUN apt-get -y update && apt-get -y install postgresql-client patch
+RUN pip install apache-airflow
+RUN pip install -r requirements.txt
+ENV AIRFLOW__CORE__FERNET_KEY=hspWEGdpVbFQmUKyvlwz3y-STqB54lGM1oui4mRQupw=
+ENV AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://postgres:postgres@172.22.0.1:5433/{0}
+ENV AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+ENV AIRFLOW__WEBSERVER__RBAC=True
+ENV AIRFLOW__LOGGING__LOGGING_LEVEL=DEBUG
+ENV AIRFLOW__LOGGING__REMOTE_LOGGING={2}
+ENV AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER=
+ENV AIRFLOW__ELASTICSEARCH__FRONTEND="http://localhost:5601/app/kibana#/discover?_a=(columns:!(message),query:(language:kuery,query:'log_id: \"{{log_id}}\"'),sort:!(log.offset,asc))"
+ENV AIRFLOW__ELASTICSEARCH__HOST=admin:admin@172.22.0.1:9200
+ENV AIRFLOW__ELASTICSEARCH_CONFIGS__USE_SSL=False
+ENV AIRFLOW__ELASTICSEARCH_CONFIGS__VERIFY_CERTS=False
+ENV AIRFLOW__ELASTICSEARCH__JSON_FORMAT=False
+ENV AIRFLOW__ELASTICSEARCH__HOST_FIELD=host.name
+ENV AIRFLOW__ELASTICSEARCH__OFFSET_FIELD=offset
+ENV AIRFLOW__ELASTICSEARCH__LOG_ID_TEMPLATE='{{dag_id}}-{{task_id}}-{{run_id}}-{{map_index}}-{{try_number}}'
+ENV AIRFLOW__CORE__LOAD_EXAMPLES=False
+ENV AIRFLOW__DATABASE__LOAD_DEFAULT_CONNECTIONS=False
+ENV AIRFLOW__CELERY__BROKER_URL=redis://172.22.0.1:6379/{1}
+ENV AIRFLOW__CELERY__RESULT_BACKEND="db+postgresql://postgres:postgres@172.22.0.1:5433/{0}"
+ENV AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth
+ENV AIRFLOW__CORE__HIDE_SENSITIVE_VAR_CONN_FIELDS=False
+ENV AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
+ENV AIRFLOW__SMTP__SMTP_HOST="172.22.0.1"
+ENV AIRFLOW__SMTP__SMTP_PORT=1025
+ENV AIRFLOW__SMTP__SMTP_STARTTLS=False
+ENV AIRFLOW__SMTP__SMTP_SSL=False
+ENV AIRFLOW__SMTP__SMTP_MAIL_FROM="airflow@{0}.com"
+ENV AIRFLOW__SECRETS__BACKEND={3}
+ENV AIRFLOW__SECRETS__BACKEND_KWARGS='{{"connections_path": "connections", "variables_path": "variables","config_path": "config", "mount_point": "airflow", "url": "http://172.22.0.1:8200", "token":"hvs.AlFE0WHKbruiBstNQURhQqz2"}}'
+ENV AIRFLOW__LINEAGE__BACKEND=openlineage.lineage_backend.OpenLineageBackend
+ENV OPENLINEAGE_URL=http://172.22.0.1:5000
+ENV OPENLINEAGE_NAMESPACE="{0}"
+ENV AIRFLOW__CORE__ENABLE_XCOM_PICKLING=True
+ENV AIRFLOW__CORE__SENSITIVE_VAR_CONN_NAMES=credential
+ENV AIRFLOW_CONN_MINIO_LOCAL='{{"conn_type": "aws", "extra": {{"aws_access_key_id": "minioadmin", "aws_secret_access_key": "minioadmin", "endpoint_url": "http://172.22.0.1:9000"}}}}'
+ENV AIRFLOW_CONN_AWS_DEFAULT=${{AIRFLOW_CONN_MINIO_LOCAL}}
 """
 
 LOGDOCKERFILE = """FROM opensearchproject/logstash-oss-with-opensearch-output-plugin:latest
@@ -122,7 +222,8 @@ output {
 }
 """
 
-PACKAGES = """iputils-ping
+PACKAGES = """build-essential
+iputils-ping
 net-tools
 iproute2
 nano
@@ -139,6 +240,7 @@ psycopg2
 apache-airflow-providers-celery
 redis
 openlineage-airflow
+astro-sdk-python[all]
 """
 
 COMPOSE = """version: "3.8"
@@ -582,6 +684,17 @@ FARMCOMPOSE = """services:
     networks:
       farm:
         ipv4_address: 172.22.0.11
+  minio:
+    image: quay.io/minio/minio
+    networks:
+      farm:
+        ipv4_address: 172.22.0.12
+    command: server /data --console-address ":9001"
+    ports:
+      - 9000:9000
+      - 9001:9001
+    volumes:
+       - ./miniodata:/data
     
 version: '3.8'
 volumes:
@@ -596,6 +709,31 @@ networks:
   farm:
     external: true
 """
+MARQUEZPOSTGRESCONF = """shared_preload_libraries = 'pg_stat_statements'
+pg_stat_statements.track = all
+pg_stat_statements.max = 10000
+track_activity_query_size = 2048
+
+listen_addresses = '*'
+"""
+
+FARMSMTPDOCKER = """FROM python:3.9
+RUN pip install sendria
+EXPOSE 1025
+"""
+
+CODEDOCKERFILE = """FROM codercom/code-server:latest
+USER root
+RUN mkdir /usr/local/airflow && chmod -R 766 /usr/local/airflow
+RUN mkdir -p .config/code-server
+ARG DEFAULT_WORKSPACE=/usr/local/airflow
+ENV PASSWORD=admin
+ENTRYPOINT ["/usr/bin/code-server","--bind-addr","0.0.0.0:7000","--disable-telemetry","--auth","password","/usr/local/airflow"]"""
+
+REDISDOCKERFILE = """FROM redis:latest
+RUN mkdir /usr/local/etc/redis
+RUN echo "databases 1000" >> /usr/local/etc/redis/redis.conf
+CMD [ "redis-server", "/usr/local/etc/redis/redis.conf" ]"""
 
 MARQUEZCONF = """server:
   applicationConnectors:
@@ -629,246 +767,10 @@ tags:
     description: Contains sensitive information
 """
 
-MARQUEZPOSTGRESCONF = """shared_preload_libraries = 'pg_stat_statements'
-pg_stat_statements.track = all
-pg_stat_statements.max = 10000
-track_activity_query_size = 2048
-
-listen_addresses = '*'
-"""
-
-FARMSMTPDOCKER = """FROM python:3.9
-RUN pip install sendria
-EXPOSE 1025
-"""
-
-CODEDOCKERFILE = """FROM codercom/code-server:latest
-USER root
-RUN mkdir /usr/local/airflow && chmod -R 766 /usr/local/airflow
-RUN mkdir -p .config/code-server
-ARG DEFAULT_WORKSPACE=/usr/local/airflow
-ENV PASSWORD=admin
-ENTRYPOINT ["/usr/bin/code-server","--bind-addr","0.0.0.0:7000","--disable-telemetry","--auth","password","/usr/local/airflow"]"""
-
-REDISDOCKERFILE = """FROM redis:latest
-RUN mkdir /usr/local/etc/redis
-RUN echo "databases 1000" >> /usr/local/etc/redis/redis.conf
-CMD [ "redis-server", "/usr/local/etc/redis/redis.conf" ]"""
-
-
-def get_or_create_farm():
-    farm = "farm"
-    if not os.path.exists(farm):
-        print("Creating new farm...")
-        os.makedirs(farm)
-        with open(os.path.join(farm, "vault.Dockerfile"), "w") as f:
-            f.write(VAULTDOCKER.format(farm))
-        with open(os.path.join(farm, "vault.json"), "w") as f:
-            f.write(VAULTJSON)
-        with open(os.path.join(farm, "start.sh"), "w") as f:
-            f.write(FARMSTART)
-        with open(os.path.join(farm, "smtp.Dockerfile"), "w") as f:
-            f.write(FARMSMTPDOCKER)
-        with open(os.path.join(farm, "docker-compose.yml"), "w") as f:
-            f.write(FARMCOMPOSE)
-        with open(os.path.join(farm, "marquez.dev.yml"), "w") as f:
-            f.write(MARQUEZCONF)
-        with open(os.path.join(farm, "postgresql.conf"), "w") as f:
-            f.write(MARQUEZPOSTGRESCONF)
-        with open(os.path.join(farm, "redis.Dockerfile"), "w") as f:
-            f.write(REDISDOCKERFILE)
-        os.chmod(
-            os.path.join(farm, "start.sh"), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO
-        )
-        print("New farm created using network as 172.22.0.1/16!")
-    else:
-        print("Updating farm...")
-        with open(os.path.join(farm, "vault.Dockerfile"), "w") as f:
-            f.write(VAULTDOCKER.format(farm))
-        with open(os.path.join(farm, "vault.json"), "w") as f:
-            f.write(VAULTJSON)
-        with open(os.path.join(farm, "start.sh"), "w") as f:
-            f.write(FARMSTART)
-        with open(os.path.join(farm, "smtp.Dockerfile"), "w") as f:
-            f.write(FARMSMTPDOCKER)
-        with open(os.path.join(farm, "docker-compose.yml"), "w") as f:
-            f.write(FARMCOMPOSE)
-        with open(os.path.join(farm, "marquez.dev.yml"), "w") as f:
-            f.write(MARQUEZCONF)
-        with open(os.path.join(farm, "postgresql.conf"), "w") as f:
-            f.write(MARQUEZPOSTGRESCONF)
-        os.chmod(
-            os.path.join(farm, "start.sh"), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO
-        )
-        print("Updated farm using network as 172.22.0.1/16!")
-
-
-def update_cache(airflow: dict):
-    airflow["type"] = "oss_dev"
-    with open(".cache", "r") as f:
-        airflows = json.load(f)
-    airflows[tgt_folder] = airflow
-    with open(".cache", "w") as f:
-        json.dump(airflows, f, indent=4)
-
-
-def get_or_create_cache(tgt_folder):
-    try:
-        with open(".cache", "r") as f:
-            airflows = json.load(f)
-    except FileNotFoundError:
-        airflows = {}
-        with open(".cache", "w") as f:
-            json.dump(airflows, f)
-    return airflows.get(tgt_folder, None)
-
-
-def porter(init):
-    result = 1
-    for i in range(init, 65535):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        result = sock.connect_ex(("127.0.0.1", i))
-        sock.close()
-        if result != 0:
-            break
-    return i
-
-
-def get_network():
-    with open(".cache", "r") as f:
-        airflows = json.load(f)
-    used_network = {airflows[folder]["network"].split('.')[-1] for folder in airflows}
-    net = next((i for i in range(2,255) if str(i) not in used_network), 1)
-    return f"172.22.{net}"
-
-
-
-def get_redis():
-    with open(".cache", "r") as f:
-        airflows = json.load(f)
-    used_redisdbs = {airflows[folder]["redisdb"] for folder in airflows}
-    return next((i for i in range(1000) if i not in used_redisdbs), 0)
-
-
-def get_webserver():
-    with open(".cache", "r") as f:
-        airflows = json.load(f)
-    used_webserver = {airflows[folder]["webserver"] for folder in airflows}
-    if not used_webserver:
-        used_webserver.add(0)
-    return porter(max(8080, max(used_webserver) + 1))
-
-
-def get_flower():
-    with open(".cache", "r") as f:
-        airflows = json.load(f)
-    used_flower = {airflows[folder]["flower"] for folder in airflows}
-    if not used_flower:
-        used_flower.add(0)
-    return porter(max(5555, max(used_flower) + 1))
-
-
-def get_code():
-    with open(".cache", "r") as f:
-        airflows = json.load(f)
-    used_code = {airflows[folder]["code"] for folder in airflows}
-    if not used_code:
-        used_code.add(0)
-    return porter(max(7000, max(used_code) + 1))
-
-
-def create_folder_and_copy_utils(folder_name, remote_login=False, vault=False, code_server=False):
-    web_p = get_webserver()
-    flower_p = get_flower()
-    code_p = get_code()
-    network = get_network()
-    redisdb = get_redis()
-    print(
-        f"Using port {str(web_p)} for webserver, {str(flower_p)} for flower, {str(code_p)} for IDE and {str(redisdb)} for redis"
-    )
-    print(f"Using network: {network}.1")
-    if not os.path.exists(folder_name):
-        os.makedirs(folder_name)
-        os.makedirs(os.path.join(folder_name, "dags"))
-        os.makedirs(os.path.join(folder_name, "logs"))
-        os.makedirs(os.path.join(folder_name, "plugins"))
-        os.makedirs(os.path.join(folder_name, "include"))
-    else:
-        print("The folder already exists!")
-        sys.exit()
-    with open(os.path.join(folder_name, "Dockerfile"), "w") as f:
-        f.write(DOCKERFILE.format(folder_name, redisdb, str(remote_login), 'airflow.providers.hashicorp.secrets.vault.VaultBackend' if vault else ''))
-    with open(os.path.join(folder_name, "packages.txt"), "w") as f:
-        f.write(PACKAGES)
-    with open(os.path.join(folder_name, "docker-compose.yaml"), "w") as f:
-        draft = (
-            COMPOSE.format(folder_name, "${PWD}", COMPOSE_CODE if code_server else "")
-            .replace("8080:8080", f"{str(web_p)}:8080")
-            .replace("5555:5555", f"{str(flower_p)}:5555")
-            .replace("7000:7000", f"{str(code_p)}:{str(code_p)}")
-        )
-        draft = draft.replace("172.22.0", network)
-        f.write(draft)
-    with open(os.path.join(folder_name, "start.sh"), "w") as f:
-        f.write(
-            START.format(folder_name)
-            .replace("8080", str(web_p))
-            .replace("5555", str(flower_p))
-            .replace("7000", str(code_p))
-        )
-    with open(os.path.join(folder_name, "stop.sh"), "w") as f:
-        f.write(STOP)
-    with open(os.path.join(folder_name, "clean.sh"), "w") as f:
-        f.write(CLEAN)
-    with open(os.path.join(folder_name, "log.Dockerfile"), "w") as f:
-        f.write(LOGDOCKERFILE)
-    with open(os.path.join(folder_name, "logstash.conf"), "w") as f:
-        f.write(LOGCONF.replace("filebeat", folder_name))
-    with open(os.path.join(folder_name, "requirements.txt"), "w") as f:
-        f.write(REQUIREMENTS)
-    # with open(os.path.join(folder_name, "code.Dockerfile"), "w") as f:
-    #     f.write(CODEDOCKERFILE.replace("7000", str(code_p)))
-    os.chmod(
-        os.path.join(folder_name, "start.sh"),
-        stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO,
-    )
-    os.chmod(
-        os.path.join(folder_name, "stop.sh"), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO
-    )
-    os.chmod(
-        os.path.join(folder_name, "clean.sh"),
-        stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO,
-    )
-    return {
-        "webserver": web_p,
-        "flower": flower_p,
-        "code": code_p,
-        "network": network,
-        "redisdb": redisdb,
-    }
-
-
-def force_create_folder_and_copy_utils(folder_name):
-    if os.path.exists(folder_name):
-        shutil.rmtree(folder_name)
-    airflow = create_folder_and_copy_utils(folder_name)
-    update_cache(airflow)
-
-def true_like(s):
-    return s.lower()[0] == "y" if s else False
-
-get_or_create_farm()
-tgt_folder = input("Project name: ")
-tgt_folder += "_airflow_oss_dev"
-REMOTE_LOGGING = true_like(input("Enable remote logging [yN]: "))
-VAULT = true_like(input("Enable vault [yN]: "))
-CODE_SERVER = true_like(input("Enable code server [yN]: "))
-if not get_or_create_cache(tgt_folder):
-    airflow = create_folder_and_copy_utils(tgt_folder, REMOTE_LOGGING, VAULT, CODE_SERVER)
-    update_cache(airflow)
-else:
-    choice = input("Name already used, overwrite [yN] :")
-    if choice.lower()[0] == "y":
-        force_create_folder_and_copy_utils(tgt_folder)
-    else:
-        sys.exit()
+ANGRY = "ヽ(`⌒´メ)ノ"
+OOPS = "¯\_(ツ)_/¯"
+CONFUSED = "(￢_￢;)"
+YAY = "(￣▽￣)ノ"
+WORKING = "__φ(。。)"
+UNSATISFIED = "(￢_￢)"
+SAYONARA = "凸(￣ヘ￣)"

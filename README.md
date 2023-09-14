@@ -5,6 +5,7 @@ Simple python script for local airflow deployment with docker. Added components 
 - hashicorp vault for secrets backend
 - vscode server for ide
 - marquez for lineage
+- minio for S3 bucket store
 
 Will be adding more going forward.
 
@@ -24,11 +25,24 @@ python Turbine.py
 
 ### Sample output
 ```
-Creating new farm...
-New farm created using network as 172.22.0.1/16!
-Folder name: testairflow
-Using port 8081 for webserver and 5556 for flower.
-Using network: 172.22.1.1
+Creating new cache__φ(。。)
+Creating new farm__φ(。。)
+New farm created using network as 172.22.0.1/16! (￣▽￣)ノ
+Airflow type:
+ 1. Astro [default]
+ 2. OSS 
+ 3. OSS Main branch
+-> 1
+Project name: abcd
+Enable remote logging [yN]: 
+Enable vault [yN]: 
+Enable code server [yN]: 
+Using port 8080 for webserver, 5555 for flower, 7000 for IDE and 0 for redis
+Using network: 172.22.2.1
+Initializing Astro project
+Pulling Airflow development files from Astro Runtime 9.1.0
+Initialized empty Astro project in /Users/abhishekbhakat/Codes/Turbine/farm/abcd-astro-airflow
+Cache updated! (￣▽￣)ノ
 ```
 
 ## Start Airflow
