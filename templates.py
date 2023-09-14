@@ -1,5 +1,4 @@
-ASTRO_DOCKERFILE = """
-USER root
+ASTRO_DOCKERFILE = """USER root
 RUN sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt bullseye-pgdg 16" > /etc/apt/sources.list.d/pgdg.list'
 RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
 RUN sudo apt-get -y update && sudo apt-get -y install postgresql-client patch
@@ -440,7 +439,7 @@ if [ $? -ne 0 ]
 then 
     echo "Farm doesn't exist. Creating..."
     docker network create -d bridge --gateway 172.22.0.1 --subnet 172.22.0.1/16 farm ;
-    docker-compose  -f ../farm/docker-compose.yml up -d
+    docker-compose  -f ../farm/docker-compose.yaml up -d
 fi
 echo "Cleaning older deployment..."
 docker-compose down >> start.log 2>&1  
