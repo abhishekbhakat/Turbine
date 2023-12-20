@@ -504,7 +504,7 @@ VAULTJSON = """{
 }
 """
 
-FARMSTART = """docker network create -d bridge --gateway 172.22.0.1 --subnet 172.22.0.1/16 farm ;
+FARMSTART = """docker network create -d bridge --gateway 172.22.0.1 --subnet 172.22.0.0/16 farm ;
 docker-compose up -d
 """
 
