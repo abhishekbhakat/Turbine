@@ -6,6 +6,8 @@ Simple python script for local airflow deployment with docker. Added components 
 - vscode server for ide
 - marquez for lineage
 - minio for S3 bucket store
+- oittaa/gcp-storage-emulator for GCS
+- azurite for blob storage
 
 Will be adding more going forward.
 
