@@ -683,7 +683,7 @@ FARMCOMPOSE = """services:
     networks:
       farm:
         ipv4_address: 172.22.0.11
-  minio:
+  backup-s3:
     image: quay.io/minio/minio
     networks:
       farm:
@@ -693,7 +693,24 @@ FARMCOMPOSE = """services:
       - 9000:9000
       - 9001:9001
     volumes:
-       - ./miniodata:/data
+       - ./backups-s3:/data
+  backup-gcs:
+    image: oittaa/gcp-storage-emulator
+    environment:
+      - PORT=9090
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./backups-gcs:/storage
+  backup-azure:
+    image: mcr.microsoft.com/azure-storage/azurite
+    ports:
+      - "10000:10000"
+    environment:
+      - AZURITE_ACCOUNTS="account1:key1:key2;account2:key1:key2"
+    volumes:
+      - ./backups-azure:/data
+    command: "azurite --blobHost 0.0.0.0 --blobPort 10000"
     
 version: '3.8'
 volumes:
