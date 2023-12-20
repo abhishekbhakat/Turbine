@@ -479,7 +479,7 @@ STOP = """docker-compose down"""
 
 CLEAN = """sed -r '/^\s*$/d' $1 > tmpfile && mv tmpfile $1"""
 
-VAULTDOCKER = """FROM vault:latest
+VAULTDOCKER = """FROM hashicorp/vault:latest
 COPY vault.json /vault/config/vault.json
 CMD ["vault", "server", "-config=/vault/config/vault.json"]
 """
