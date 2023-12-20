@@ -1,4 +1,4 @@
-import os, sys, stat, socket, json, shutil
+import os, sys, stat, socket, json, shutil, platform
 from templates import *
 
 # check if the cache file exists
@@ -151,6 +151,7 @@ def create_folder_and_copy_utils(
                 "airflow.providers.hashicorp.secrets.vault.VaultBackend"
                 if vault
                 else "",
+                arch
             )
         )
     with open(os.path.join(folder_name, "packages.txt"), "a") as f:
@@ -214,8 +215,28 @@ def true_like(s):
     return s.lower()[0] == "y" if s else False
 
 
+def check_platform():
+    architechtures = {
+        "x86_64": "amd64",
+        "AMD64": "amd64",
+        "arm64": "arm64",
+        "aarch64": "arm64",
+        "armv8l": "arm64",
+    }
+    if platform.system() == "Windows":
+        print("Windows is not supported! {ANGRY}")
+        sys.exit()
+    arch = platform.machine()
+    if arch not in architechtures:
+        print(f"Unsupported architecture {arch}! {ANGRY}")
+        sys.exit()
+    return architechtures[arch]
+
+arch = check_platform()
 get_or_create_farm()
-airflow_type = input("Airflow type:\n 1. Astro [default]\n 2. OSS \n 3. OSS Main branch\n-> ")
+airflow_type = input(
+    "Airflow type:\n 1. Astro [default]\n 2. OSS \n 3. OSS Main branch\n-> "
+)
 if airflow_type not in ["1", "2", "3", ""]:
     print(f"Invalid choice! {ANGRY}")
     sys.exit()

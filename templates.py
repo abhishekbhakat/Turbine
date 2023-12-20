@@ -58,9 +58,9 @@ RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-k
 RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -
 RUN echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
 RUN apt-get -y update && apt-get -y install postgresql-client patch yarn
-RUN wget https://nodejs.org/dist/v18.12.1/node-v18.12.1-linux-arm64.tar.xz
-RUN tar -C /usr/local --strip-components 1 -xvf node-v18.12.1-linux-arm64.tar.xz
-RUN rm -rf node-v18.12.1-linux-arm64.tar.xz
+RUN wget https://nodejs.org/dist/v18.12.1/node-v18.12.1-linux-{4}.tar.xz
+RUN tar -C /usr/local --strip-components 1 -xvf node-v18.12.1-linux-{4}.tar.xz
+RUN rm -rf node-v18.12.1-linux-{4}.tar.xz
 RUN cd airflow && python setup.py compile_assets
 RUN cd airflow && pip install .
 RUN rm -rf airflow
