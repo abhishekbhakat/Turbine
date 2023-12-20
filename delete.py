@@ -72,7 +72,7 @@ except ValueError:
 if choice < -2 or choice > len(airflows):
     print(f"Invalid choice! {ANGRY}")
     exit()
-elif choice < 0:
+elif choice > 0:
     for project in airflows:
         delete_proj(project)
     if choice < -1:
