@@ -434,7 +434,7 @@ COMPOSE_CODE = """code:
         ipv4_address: "172.22.0.111"
         """
 START = """echo "Deploying..."
-docker-compose ls | grep farm > start.log 2>&1  
+docker compose ls | grep farm > start.log 2>&1  
 if [ $? -ne 0 ]
 then 
     echo "Farm doesn't exist. Creating..."
