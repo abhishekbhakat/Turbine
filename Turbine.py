@@ -34,7 +34,9 @@ def get_or_create_farm():
     if not os.path.exists(farm):
         print(f"Creating new farm{WORKING}")
         os.makedirs(farm)
-        os.makedirs(os.path.join(farm, "miniodata"))
+        os.makedirs(os.path.join(farm, "backups-s3"))
+        os.makedirs(os.path.join(farm, "backups-gcs"))
+        os.makedirs(os.path.join(farm, "backups-azure"))
         write_farm(farm)
         print(f"New farm created using network as 172.22.0.1/16! {YAY}")
     else:
