@@ -229,7 +229,7 @@ elif airflow_type == "3":
     DOCKERFILE = DEV_DOCKERFILE
     airflow_type_str = "oss_dev"
 tgt_folder = input("Project name: ")
-tgt_folder = f"{tgt_folder}-{airflow_type_str}-airflow"
+tgt_folder = f"{tgt_folder.lower()}-{airflow_type_str}-airflow"
 REMOTE_LOGGING = true_like(input("Enable remote logging [yN]: "))
 VAULT = true_like(input("Enable vault [yN]: "))
 CODE_SERVER = true_like(input("Enable code server [yN]: "))
