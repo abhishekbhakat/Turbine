@@ -3,6 +3,7 @@ RUN sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt bullseye-pgdg 
 RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
 RUN sudo apt-get -y update && sudo apt-get -y install postgresql-client patch
 USER astro
+ENV AIRFLOW__LOGGING__COLORED_CONSOLE_LOG=False
 ENV AIRFLOW__CORE__FERNET_KEY=hspWEGdpVbFQmUKyvlwz3y-STqB54lGM1oui4mRQupw=
 ENV AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://postgres:postgres@172.22.0.1:5433/{0}
 ENV AIRFLOW__CORE__EXECUTOR=CeleryExecutor
@@ -66,6 +67,7 @@ RUN cd airflow && python setup.py compile_assets
 RUN cd airflow && pip install .
 RUN rm -rf airflow
 RUN pip install -r requirements.txt
+ENV AIRFLOW__LOGGING__COLORED_CONSOLE_LOG=False
 ENV AIRFLOW__CORE__FERNET_KEY=hspWEGdpVbFQmUKyvlwz3y-STqB54lGM1oui4mRQupw=
 ENV AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://postgres:postgres@172.22.0.1:5433/{0}
 ENV AIRFLOW__CORE__EXECUTOR=CeleryExecutor
@@ -119,6 +121,7 @@ RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-k
 RUN apt-get -y update && apt-get -y install postgresql-client patch
 RUN pip install apache-airflow
 RUN pip install -r requirements.txt
+ENV AIRFLOW__LOGGING__COLORED_CONSOLE_LOG=False
 ENV AIRFLOW__CORE__FERNET_KEY=hspWEGdpVbFQmUKyvlwz3y-STqB54lGM1oui4mRQupw=
 ENV AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://postgres:postgres@172.22.0.1:5433/{0}
 ENV AIRFLOW__CORE__EXECUTOR=CeleryExecutor
@@ -234,6 +237,8 @@ gnupg
 wget
 git
 libpq-dev
+pkg-config
+default-libmysqlclient-dev
 """
 
 REQUIREMENTS = """apache-airflow-providers-elasticsearch
@@ -448,7 +453,7 @@ echo "Cleaning older deployment..."
 docker compose down >> start.log 2>&1  
 docker volume prune -f >> start.log 2>&1  ;
 echo "Building image..."
-docker build --no-cache -t {0}:latest .  >> start.log 2>&1  
+docker build -t {0}:latest .  >> start.log 2>&1  
 if [ $? -ne 0 ]
 then 
     echo "Build failed. Exiting..."
@@ -456,17 +461,8 @@ then
 fi
 echo "Preping db..."
 docker run -it --net farm -e PGPASSWORD=postgres {0}:latest psql -h 172.22.0.1 -p 5433 -U postgres -c 'CREATE DATABASE "{0}";' >> start.log 2>&1  
-if [ $? -eq 0 ]
-then 
-    docker run -it --net farm  {0}:latest airflow db init >> start.log 2>&1
-    docker run -it --net farm {0}:latest airflow users create --username admin --firstname FIRST_NAME  --lastname LAST_NAME --role Admin --email admin@example.org --password admin >> start.log 2>&1  
-else
-    docker run -it --net farm  {0}:latest airflow db upgrade >> start.log 2>&1  
-fi
-alias decolorize='sed -r "s/\\x1B\\[([0-9]{{1,3}}(;[0-9]{{1,2}})?)?[mGK]//g"'
-cp start.log start_clr.log
-cat start_clr.log | decolorize > start.log 
-rm start_clr.log
+docker run -it --net farm  {0}:latest airflow db migrate >> start.log 2>&1
+docker run -it --net farm {0}:latest airflow users create --username admin --firstname FIRST_NAME  --lastname LAST_NAME --role Admin --email admin@example.org --password admin >> start.log 2>&1  
 docker compose up -d --build >> start.log 2>&1  
 echo "Deployed:"
 echo "Airflow: http://localhost:8080"
