@@ -9,7 +9,8 @@ ENV AIRFLOW__CORE__EXECUTOR=CeleryExecutor
 ENV AIRFLOW__WEBSERVER__RBAC=True
 ENV AIRFLOW__LOGGING__LOGGING_LEVEL=DEBUG
 ENV AIRFLOW__LOGGING__REMOTE_LOGGING={2}
-ENV AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER=
+ENV AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID={5}
+ENV AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER={6}
 ENV AIRFLOW__ELASTICSEARCH__FRONTEND="http://localhost:5601/app/kibana#/discover?_a=(columns:!(message),query:(language:kuery,query:'log_id: \"{{log_id}}\"'),sort:!(log.offset,asc))"
 ENV AIRFLOW__ELASTICSEARCH__HOST=admin:admin@172.22.0.1:9200
 ENV AIRFLOW__ELASTICSEARCH_CONFIGS__USE_SSL=False
@@ -71,7 +72,8 @@ ENV AIRFLOW__CORE__EXECUTOR=CeleryExecutor
 ENV AIRFLOW__WEBSERVER__RBAC=True
 ENV AIRFLOW__LOGGING__LOGGING_LEVEL=DEBUG
 ENV AIRFLOW__LOGGING__REMOTE_LOGGING={2}
-ENV AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER=
+ENV AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID={5}
+ENV AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER={6}
 ENV AIRFLOW__ELASTICSEARCH__FRONTEND="http://localhost:5601/app/kibana#/discover?_a=(columns:!(message),query:(language:kuery,query:'log_id: \"{{log_id}}\"'),sort:!(log.offset,asc))"
 ENV AIRFLOW__ELASTICSEARCH__HOST=admin:admin@172.22.0.1:9200
 ENV AIRFLOW__ELASTICSEARCH_CONFIGS__USE_SSL=False
@@ -123,7 +125,8 @@ ENV AIRFLOW__CORE__EXECUTOR=CeleryExecutor
 ENV AIRFLOW__WEBSERVER__RBAC=True
 ENV AIRFLOW__LOGGING__LOGGING_LEVEL=DEBUG
 ENV AIRFLOW__LOGGING__REMOTE_LOGGING={2}
-ENV AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER=
+ENV AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID={5}
+ENV AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER={6}
 ENV AIRFLOW__ELASTICSEARCH__FRONTEND="http://localhost:5601/app/kibana#/discover?_a=(columns:!(message),query:(language:kuery,query:'log_id: \"{{log_id}}\"'),sort:!(log.offset,asc))"
 ENV AIRFLOW__ELASTICSEARCH__HOST=admin:admin@172.22.0.1:9200
 ENV AIRFLOW__ELASTICSEARCH_CONFIGS__USE_SSL=False
@@ -645,7 +648,7 @@ FARMCOMPOSE = """services:
       - "5001:5001"
     volumes:
       - utils:/opt/marquez
-      - ./marquez.dev.yml:/usr/src/app/marquez.dev.yml
+      - ./marquez.dev.yaml:/usr/src/app/marquez.dev.yaml
     depends_on:
       - lineagedb
     entrypoint: ["./entrypoint.sh"]
@@ -689,6 +692,9 @@ FARMCOMPOSE = """services:
       farm:
         ipv4_address: 172.22.0.12
     command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
     ports:
       - 9000:9000
       - 9001:9001

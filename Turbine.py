@@ -1,5 +1,6 @@
 import os, sys, stat, socket, json, shutil, platform
 from templates import *
+from delete import delete_proj
 
 # check if the cache file exists
 file_path = os.path.join(os.getcwd(), ".cache")
@@ -18,9 +19,9 @@ def write_farm(farm):
         f.write(FARMSTART)
     with open(os.path.join(farm, "smtp.Dockerfile"), "w") as f:
         f.write(FARMSMTPDOCKER)
-    with open(os.path.join(farm, "docker-compose.yml"), "w") as f:
+    with open(os.path.join(farm, "docker-compose.yaml"), "w") as f:
         f.write(FARMCOMPOSE)
-    with open(os.path.join(farm, "marquez.dev.yml"), "w") as f:
+    with open(os.path.join(farm, "marquez.dev.yaml"), "w") as f:
         f.write(MARQUEZCONF)
     with open(os.path.join(farm, "postgresql.conf"), "w") as f:
         f.write(MARQUEZPOSTGRESCONF)
@@ -120,7 +121,13 @@ def get_code():
 
 
 def create_folder_and_copy_utils(
-    folder_name, remote_login=False, vault=False, code_server=False, airflow_type="1"
+    folder_name,
+    remote_login=True,
+    vault=False,
+    code_server=False,
+    airflow_type="1",
+    docker_remote_con_id="",
+    docker_remote_base_folder="",
 ):
     web_p = get_webserver()
     flower_p = get_flower()
@@ -151,7 +158,9 @@ def create_folder_and_copy_utils(
                 "airflow.providers.hashicorp.secrets.vault.VaultBackend"
                 if vault
                 else "",
-                arch
+                arch,
+                "" if not remote_login else docker_remote_con_id,
+                "" if not remote_login else docker_remote_base_folder,
             )
         )
     with open(os.path.join(folder_name, "packages.txt"), "a") as f:
@@ -204,13 +213,6 @@ def create_folder_and_copy_utils(
     }
 
 
-def force_create_folder_and_copy_utils(folder_name):
-    if os.path.exists(folder_name):
-        shutil.rmtree(folder_name)
-    airflow = create_folder_and_copy_utils(folder_name)
-    update_cache(airflow)
-
-
 def true_like(s):
     return s.lower()[0] == "y" if s else False
 
@@ -232,6 +234,7 @@ def check_platform():
         sys.exit()
     return architechtures[arch]
 
+
 arch = check_platform()
 get_or_create_farm()
 airflow_type = input(
@@ -251,19 +254,51 @@ elif airflow_type == "3":
     airflow_type_str = "oss_dev"
 tgt_folder = input("Project name: ")
 tgt_folder = f"{tgt_folder.lower()}-{airflow_type_str}-airflow"
-REMOTE_LOGGING = true_like(input("Enable remote logging [yN]: "))
+docker_remote = input("Enable remote logging [Yn]: ")
+REMOTE_LOGGING = docker_remote.lower()[0] == "n" if docker_remote else True
+docker_remote_con_id = "aws_default"
+docker_remote_base_folder = f"s3://{tgt_folder.lower()}"
+if REMOTE_LOGGING:
+    remote_choice = input(
+        "Remote logging type:\n 1. S3 [default]\n 2. Elasticseach\n-> "
+    )
+    if remote_choice not in ["1", "2", ""]:
+        print(f"Invalid choice! {ANGRY}")
+        sys.exit()
+    if remote_choice in ["1", ""]:
+        docker_remote_con_id = "aws_default"
+        docker_remote_base_folder = f"s3://{tgt_folder.lower()}"
+    elif remote_choice == "2":
+        docker_remote_base_folder = ""
+        docker_remote_con_id = ""
 VAULT = true_like(input("Enable vault [yN]: "))
 CODE_SERVER = true_like(input("Enable code server [yN]: "))
 if not get_or_create_cache(tgt_folder):
     airflow = create_folder_and_copy_utils(
-        tgt_folder, REMOTE_LOGGING, VAULT, CODE_SERVER, airflow_type
+        tgt_folder,
+        REMOTE_LOGGING,
+        VAULT,
+        CODE_SERVER,
+        airflow_type,
+        docker_remote_con_id,
+        docker_remote_base_folder,
     )
     update_cache(airflow, airflow_type_str)
 else:
     print(f"Name already used! {CONFUSED}")
-    choice = input("overwrite [yN]:")
-    if not choice:
-        pass
-    elif choice.lower()[0] == "y":
-        force_create_folder_and_copy_utils(tgt_folder)
-    print(f"Not updating! {UNSATISFIED}")
+    choice = true_like(input("overwrite [yN]:"))
+    if choice:
+        delete_proj(tgt_folder)
+        airflow = create_folder_and_copy_utils(
+            tgt_folder,
+            REMOTE_LOGGING,
+            VAULT,
+            CODE_SERVER,
+            airflow_type,
+            docker_remote_con_id,
+            docker_remote_base_folder,
+        )
+        update_cache(airflow, airflow_type_str)
+    else:
+        print(f"Not updating! {UNSATISFIED}")
+    sys.exit()
