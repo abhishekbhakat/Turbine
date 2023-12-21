@@ -4,6 +4,8 @@ RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo 
 RUN sudo apt-get -y update && sudo apt-get -y install postgresql-client patch
 USER astro
 ENV AIRFLOW__LOGGING__COLORED_CONSOLE_LOG=False
+ENV AIRFLOW__WEBSERVER__NAVBAR_COLOR=#1E1E1E
+ENV AIRFLOW__WEBSERVER__NAVBAR_TEXT_COLOR=#FFFFFF
 ENV AIRFLOW__CORE__FERNET_KEY=hspWEGdpVbFQmUKyvlwz3y-STqB54lGM1oui4mRQupw=
 ENV AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://postgres:postgres@172.22.0.1:5433/{0}
 ENV AIRFLOW__CORE__EXECUTOR=CeleryExecutor
@@ -68,6 +70,8 @@ RUN cd airflow && pip install .
 RUN rm -rf airflow
 RUN pip install -r requirements.txt
 ENV AIRFLOW__LOGGING__COLORED_CONSOLE_LOG=False
+ENV AIRFLOW__WEBSERVER__NAVBAR_COLOR=#1E1E1E
+ENV AIRFLOW__WEBSERVER__NAVBAR_TEXT_COLOR=#FFFFFF
 ENV AIRFLOW__CORE__FERNET_KEY=hspWEGdpVbFQmUKyvlwz3y-STqB54lGM1oui4mRQupw=
 ENV AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://postgres:postgres@172.22.0.1:5433/{0}
 ENV AIRFLOW__CORE__EXECUTOR=CeleryExecutor
@@ -122,6 +126,8 @@ RUN apt-get -y update && apt-get -y install postgresql-client patch
 RUN pip install apache-airflow
 RUN pip install -r requirements.txt
 ENV AIRFLOW__LOGGING__COLORED_CONSOLE_LOG=False
+ENV AIRFLOW__WEBSERVER__NAVBAR_COLOR=#1E1E1E
+ENV AIRFLOW__WEBSERVER__NAVBAR_TEXT_COLOR=#FFFFFF
 ENV AIRFLOW__CORE__FERNET_KEY=hspWEGdpVbFQmUKyvlwz3y-STqB54lGM1oui4mRQupw=
 ENV AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://postgres:postgres@172.22.0.1:5433/{0}
 ENV AIRFLOW__CORE__EXECUTOR=CeleryExecutor
