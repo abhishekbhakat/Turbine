@@ -442,10 +442,10 @@ if [ $? -ne 0 ]
 then 
     echo "Farm doesn't exist. Creating..."
     docker network create -d bridge --gateway 172.22.0.1 --subnet 172.22.0.1/16 farm ;
-    docker-compose  -f ../farm/docker-compose.yaml up -d
+    docker compose  -f ../farm/docker-compose.yaml up -d
 fi
 echo "Cleaning older deployment..."
-docker-compose down >> start.log 2>&1  
+docker compose down >> start.log 2>&1  
 docker volume prune -f >> start.log 2>&1  ;
 echo "Building image..."
 docker build --no-cache -t {0}:latest .  >> start.log 2>&1  
@@ -467,7 +467,7 @@ alias decolorize='sed -r "s/\\x1B\\[([0-9]{{1,3}}(;[0-9]{{1,2}})?)?[mGK]//g"'
 cp start.log start_clr.log
 cat start_clr.log | decolorize > start.log 
 rm start_clr.log
-docker-compose up -d --build >> start.log 2>&1  
+docker compose up -d --build >> start.log 2>&1  
 echo "Deployed:"
 echo "Airflow: http://localhost:8080"
 echo "Airflow Swagger: http://localhost:8080/api/v1/ui/"
@@ -478,7 +478,7 @@ echo "Opensearch: http://localhost:5601/app/home#/"
 echo "Marquez: http://localhost:3000/"
 """
 
-STOP = """docker-compose down"""
+STOP = """docker compose down"""
 
 CLEAN = """sed -r '/^\s*$/d' $1 > tmpfile && mv tmpfile $1"""
 
@@ -508,7 +508,7 @@ VAULTJSON = """{
 """
 
 FARMSTART = """docker network create -d bridge --gateway 172.22.0.1 --subnet 172.22.0.0/16 farm ;
-docker-compose up -d
+docker compose up -d
 """
 
 FARMCOMPOSE = """services:
