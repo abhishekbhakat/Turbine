@@ -84,4 +84,4 @@ if __name__ == "__main__":
             os.remove('.cache')
             print(f"Destroyed everything! {SAYONARA}")
     elif choice > 0:
-        delete_proj(airflows[choice-1])
+        delete_proj(list(airflows.keys())[choice-1])
