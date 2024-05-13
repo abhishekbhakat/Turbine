@@ -245,6 +245,9 @@ git
 libpq-dev
 pkg-config
 default-libmysqlclient-dev
+libxml2-dev
+libxmlsec1-dev
+libxmlsec1-openssl
 """
 
 REQUIREMENTS = """apache-airflow-providers-elasticsearch
