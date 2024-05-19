@@ -29,7 +29,7 @@ python Turbine.py
 ```
 Creating new cache__φ(。。)
 Creating new farm__φ(。。)
-New farm created using network as 172.22.0.1/16! (￣▽￣)ノ
+New farm created using network as 172.27.0.1/16! (￣▽￣)ノ
 Airflow type:
  1. Astro [default]
  2. OSS 
@@ -40,7 +40,7 @@ Enable remote logging [yN]:
 Enable vault [yN]: 
 Enable code server [yN]: 
 Using port 8080 for webserver, 5555 for flower, 7000 for IDE and 0 for redis
-Using network: 172.22.2.1
+Using network: 172.27.2.1
 Initializing Astro project
 Pulling Airflow development files from Astro Runtime 9.1.0
 Initialized empty Astro project in /Users/abhishekbhakat/Codes/Turbine/farm/abcd-astro-airflow

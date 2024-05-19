@@ -39,11 +39,11 @@ def get_or_create_farm():
         os.makedirs(os.path.join(farm, "backups-gcs"))
         os.makedirs(os.path.join(farm, "backups-azure"))
         write_farm(farm)
-        print(f"New farm created using network as 172.22.0.1/16! {YAY}")
+        print(f"New farm created using network as 172.27.0.1/16! {YAY}")
     else:
         print(f"Updating farm{WORKING}")
         write_farm(farm)
-        print(f"Updated farm using network as 172.22.0.1/16! {YAY}")
+        print(f"Updated farm using network as 172.27.0.1/16! {YAY}")
 
 
 def update_cache(airflow: dict, airflow_type_str):
@@ -83,7 +83,7 @@ def get_network():
         airflows = json.load(f)
     used_network = {airflows[folder]["network"].split(".")[-1] for folder in airflows}
     net = next((i for i in range(2, 255) if str(i) not in used_network), 1)
-    return f"172.22.{net}"
+    return f"172.27.{net}"
 
 
 def get_redis():
@@ -172,7 +172,7 @@ def create_folder_and_copy_utils(
             .replace("5555:5555", f"{str(flower_p)}:5555")
             .replace("7000:7000", f"{str(code_p)}:{str(code_p)}")
         )
-        draft = draft.replace("172.22.0", network)
+        draft = draft.replace("172.27.0", network)
         f.write(draft)
     with open(os.path.join(folder_name, "start.sh"), "w") as f:
         f.write(
