@@ -471,6 +471,8 @@ fi
 echo "Preping db..."
 docker run --rm -it --net farm -e PGPASSWORD=postgres {0}:latest psql -h 172.27.0.1 -p 5433 -U postgres -c 'CREATE DATABASE "{0}";' >> start.log 2>&1  
 docker run --rm -it --net farm  {0}:latest airflow db migrate >> start.log 2>&1
+echo "Waiting for db... before creating users..."
+sleep 10
 docker run --rm -it --net farm {0}:latest airflow users create --username admin --firstname FIRST_NAME  --lastname LAST_NAME --role Admin --email admin@example.org --password admin >> start.log 2>&1  
 docker compose up -d --build >> start.log 2>&1  
 echo "Deployed:"
