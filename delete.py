@@ -4,10 +4,10 @@ import json
 from templates import *
 
 # check if the cache file exists
-file_path = os.path.join(os.getcwd(), ".cache")
-if not os.path.exists(file_path):
+cache_path = os.path.join(os.getcwd(), ".cache")
+if not os.path.exists(cache_path):
     print(f"Creating new cache{WORKING}")
-    with open(file_path, "w") as f:
+    with open(cache_path, "w") as f:
         json.dump({}, f, indent=4)
 
 
