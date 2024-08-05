@@ -1,6 +1,12 @@
-import os, sys, stat, socket, json, shutil, platform
-from templates import *
+import json
+import os
+import platform
+import socket
+import stat
+import sys
+
 from delete import delete_proj
+from templates import *
 
 # check if the cache file exists
 file_path = os.path.join(os.getcwd(), ".cache")
@@ -48,7 +54,7 @@ def get_or_create_farm():
 
 def update_cache(airflow: dict, airflow_type_str):
     airflow["type"] = airflow_type_str
-    with open(".cache", "r") as f:
+    with open(".cache") as f:
         airflows = json.load(f)
     airflows[tgt_folder] = airflow
     with open(".cache", "w") as f:
@@ -58,7 +64,7 @@ def update_cache(airflow: dict, airflow_type_str):
 
 def get_or_create_cache(tgt_folder):
     try:
-        with open(".cache", "r") as f:
+        with open(".cache") as f:
             airflows = json.load(f)
     except FileNotFoundError:
         airflows = {}
@@ -79,7 +85,7 @@ def porter(init):
 
 
 def get_network():
-    with open(".cache", "r") as f:
+    with open(".cache") as f:
         airflows = json.load(f)
     used_network = {airflows[folder]["network"].split(".")[-1] for folder in airflows}
     net = next((i for i in range(2, 255) if str(i) not in used_network), 1)
@@ -87,14 +93,14 @@ def get_network():
 
 
 def get_redis():
-    with open(".cache", "r") as f:
+    with open(".cache") as f:
         airflows = json.load(f)
     used_redisdbs = {airflows[folder]["redisdb"] for folder in airflows}
     return next((i for i in range(1000) if i not in used_redisdbs), 0)
 
 
 def get_webserver():
-    with open(".cache", "r") as f:
+    with open(".cache") as f:
         airflows = json.load(f)
     used_webserver = {airflows[folder]["webserver"] for folder in airflows}
     if not used_webserver:
@@ -103,7 +109,7 @@ def get_webserver():
 
 
 def get_flower():
-    with open(".cache", "r") as f:
+    with open(".cache") as f:
         airflows = json.load(f)
     used_flower = {airflows[folder]["flower"] for folder in airflows}
     if not used_flower:
@@ -112,7 +118,7 @@ def get_flower():
 
 
 def get_code():
-    with open(".cache", "r") as f:
+    with open(".cache") as f:
         airflows = json.load(f)
     used_code = {airflows[folder]["code"] for folder in airflows}
     if not used_code:
@@ -134,9 +140,7 @@ def create_folder_and_copy_utils(
     code_p = get_code()
     network = get_network()
     redisdb = get_redis()
-    print(
-        f"Using port {str(web_p)} for webserver, {str(flower_p)} for flower, {str(code_p)} for IDE and {str(redisdb)} for redis"
-    )
+    print(f"Using port {str(web_p)} for webserver, {str(flower_p)} for flower, {str(code_p)} for IDE and {str(redisdb)} for redis")
     print(f"Using network: {network}.1")
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
@@ -155,9 +159,7 @@ def create_folder_and_copy_utils(
                 folder_name,
                 redisdb,
                 str(remote_login),
-                "airflow.providers.hashicorp.secrets.vault.VaultBackend"
-                if vault
-                else "",
+                "airflow.providers.hashicorp.secrets.vault.VaultBackend" if vault else "",
                 arch,
                 "" if not remote_login else docker_remote_con_id,
                 "" if not remote_login else docker_remote_base_folder,
@@ -166,21 +168,11 @@ def create_folder_and_copy_utils(
     with open(os.path.join(folder_name, "packages.txt"), "a") as f:
         f.write(PACKAGES)
     with open(os.path.join(folder_name, "docker-compose.yaml"), "w") as f:
-        draft = (
-            COMPOSE.format(folder_name, "${PWD}", COMPOSE_CODE if code_server else "")
-            .replace("8080:8080", f"{str(web_p)}:8080")
-            .replace("5555:5555", f"{str(flower_p)}:5555")
-            .replace("7000:7000", f"{str(code_p)}:{str(code_p)}")
-        )
+        draft = COMPOSE.format(folder_name, "${PWD}", COMPOSE_CODE if code_server else "").replace("8080:8080", f"{str(web_p)}:8080").replace("5555:5555", f"{str(flower_p)}:5555").replace("7000:7000", f"{str(code_p)}:{str(code_p)}")
         draft = draft.replace("172.27.0", network)
         f.write(draft)
     with open(os.path.join(folder_name, "start.sh"), "w") as f:
-        f.write(
-            START.format(folder_name)
-            .replace("8080", str(web_p))
-            .replace("5555", str(flower_p))
-            .replace("7000", str(code_p))
-        )
+        f.write(START.format(folder_name).replace("8080", str(web_p)).replace("5555", str(flower_p)).replace("7000", str(code_p)))
     with open(os.path.join(folder_name, "stop.sh"), "w") as f:
         f.write(STOP)
     with open(os.path.join(folder_name, "clean.sh"), "w") as f:
@@ -197,9 +189,7 @@ def create_folder_and_copy_utils(
         os.path.join(folder_name, "start.sh"),
         stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO,
     )
-    os.chmod(
-        os.path.join(folder_name, "stop.sh"), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO
-    )
+    os.chmod(os.path.join(folder_name, "stop.sh"), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
     os.chmod(
         os.path.join(folder_name, "clean.sh"),
         stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO,
@@ -237,9 +227,7 @@ def check_platform():
 
 arch = check_platform()
 get_or_create_farm()
-airflow_type = input(
-    "Airflow type:\n 1. Astro [default]\n 2. OSS \n 3. OSS Main branch\n-> "
-)
+airflow_type = input("Airflow type:\n 1. Astro [default]\n 2. OSS \n 3. OSS Main branch\n-> ")
 if airflow_type not in ["1", "2", "3", ""]:
     print(f"Invalid choice! {ANGRY}")
     sys.exit()
@@ -259,9 +247,7 @@ REMOTE_LOGGING = docker_remote.lower()[0] == "n" if docker_remote else True
 docker_remote_con_id = "aws_default"
 docker_remote_base_folder = f"s3://{tgt_folder.lower()}"
 if REMOTE_LOGGING:
-    remote_choice = input(
-        "Remote logging type:\n 1. S3 [default]\n 2. Elasticseach\n-> "
-    )
+    remote_choice = input("Remote logging type:\n 1. S3 [default]\n 2. Elasticseach\n-> ")
     if remote_choice not in ["1", "2", ""]:
         print(f"Invalid choice! {ANGRY}")
         sys.exit()

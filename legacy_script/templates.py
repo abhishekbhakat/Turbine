@@ -182,7 +182,7 @@ input {
       "/usr/local/airflow/logs/*/*/*/*.log"
     ]
     codec => multiline {
-          pattern => "^\[[0-9\-T\:\.\+]+\]"
+          pattern => "^\\[[0-9\\-T\\:\\.\\+]+\\]"
           negate => true
           what => "previous"
     }
@@ -203,8 +203,8 @@ filter {
   }
   mutate {
     gsub => [
-      "message", "\[\\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]", "",
-      "message", "\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]\]?", "",
+      "message", "\\[\\x1B\\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]", "",
+      "message", "\\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]\\]?", "",
       "message", "\\\\e",""
     ]
   }
@@ -432,7 +432,7 @@ networks:
             flower: "172.27.0.107"
             worker-1: "172.27.0.108"
             backup: "172.27.0.109"
-      
+
       """
 COMPOSE_CODE = """code:
     hostname: code
@@ -451,30 +451,30 @@ COMPOSE_CODE = """code:
         ipv4_address: "172.27.0.111"
         """
 START = """echo "Deploying..."
-docker compose ls | grep farm > start.log 2>&1  
+docker compose ls | grep farm > start.log 2>&1
 if [ $? -ne 0 ]
-then 
+then
     echo "Farm doesn't exist. Creating..."
     docker network create -d bridge --gateway 172.27.0.1 --subnet 172.27.0.1/16 farm ;
     docker compose  -f ../farm/docker-compose.yaml up -d
 fi
 echo "Cleaning older deployment..."
-docker compose down >> start.log 2>&1  
+docker compose down >> start.log 2>&1
 docker volume prune -f >> start.log 2>&1  ;
 echo "Building image..."
-docker build -t {0}:latest .  >> start.log 2>&1  
+docker build -t {0}:latest .  >> start.log 2>&1
 if [ $? -ne 0 ]
-then 
+then
     echo "Build failed. Exiting..."
     exit 1
 fi
 echo "Preping db..."
-docker run --rm -it --net farm -e PGPASSWORD=postgres {0}:latest psql -h 172.27.0.1 -p 5433 -U postgres -c 'CREATE DATABASE "{0}";' >> start.log 2>&1  
+docker run --rm -it --net farm -e PGPASSWORD=postgres {0}:latest psql -h 172.27.0.1 -p 5433 -U postgres -c 'CREATE DATABASE "{0}";' >> start.log 2>&1
 docker run --rm -it --net farm  {0}:latest airflow db migrate >> start.log 2>&1
 echo "Waiting for db... before creating users..."
 sleep 10
-docker run --rm -it --net farm {0}:latest airflow users create --username admin --firstname FIRST_NAME  --lastname LAST_NAME --role Admin --email admin@example.org --password admin >> start.log 2>&1  
-docker compose up -d --build >> start.log 2>&1  
+docker run --rm -it --net farm {0}:latest airflow users create --username admin --firstname FIRST_NAME  --lastname LAST_NAME --role Admin --email admin@example.org --password admin >> start.log 2>&1
+docker compose up -d --build >> start.log 2>&1
 echo "Deployed:"
 echo "Airflow: http://localhost:8080"
 echo "Airflow Swagger: http://localhost:8080/api/v1/ui/"
@@ -487,27 +487,27 @@ echo "Marquez: http://localhost:3000/"
 
 STOP = """docker compose down"""
 
-CLEAN = """sed -r '/^\s*$/d' $1 > tmpfile && mv tmpfile $1"""
+CLEAN = r"""sed -r '/^\s*$/d' $1 > tmpfile && mv tmpfile $1"""
 
 VAULTDOCKER = """FROM hashicorp/vault:latest
 COPY vault.json /vault/config/vault.json
 CMD ["vault", "server", "-config=/vault/config/vault.json"]
 """
-VAULTJSON = """{         
+VAULTJSON = """{
   "ui" : "true",
-  "disable_mlock" : "true",                        
-  "listener":  {                     
-    "tcp":  {                        
-      "address":  "0.0.0.0:8200",  
-      "tls_disable":  "true"         
-    }                                
-  },                                 
-  "backend": {                       
-    "file": {                        
-      "path": "/vault/file"          
-    }                                
-  },                                 
-  "default_lease_ttl": "168h",       
+  "disable_mlock" : "true",
+  "listener":  {
+    "tcp":  {
+      "address":  "0.0.0.0:8200",
+      "tls_disable":  "true"
+    }
+  },
+  "backend": {
+    "file": {
+      "path": "/vault/file"
+    }
+  },
+  "default_lease_ttl": "168h",
   "max_lease_ttl": "0h",
   "api_addr": "http://0.0.0.0:8200"
 
@@ -724,7 +724,7 @@ FARMCOMPOSE = """services:
     volumes:
       - ./backups-azure:/data
     command: "azurite --blobHost 0.0.0.0 --blobPort 10000"
-    
+
 version: '3.8'
 volumes:
   pg_data:
@@ -797,7 +797,7 @@ tags:
 """
 
 ANGRY = "ヽ(`⌒´メ)ノ"
-OOPS = "¯\_(ツ)_/¯"
+OOPS = r"¯\_(ツ)_/¯"
 CONFUSED = "(￢_￢;)"
 YAY = "(￣▽￣)ノ"
 WORKING = "__φ(。。)"

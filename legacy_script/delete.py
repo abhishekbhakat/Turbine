@@ -1,6 +1,7 @@
+import json
 import os
 import shutil
-import json
+
 from templates import *
 
 # check if the cache file exists
@@ -13,7 +14,7 @@ if not os.path.exists(cache_path):
 
 def delete_from_cache(tgt_folder):
     # update_cache
-    with open(cache_path, "r") as f:
+    with open(cache_path) as f:
         airflows = json.load(f)
         try:
             airflows.pop(tgt_folder)
@@ -34,7 +35,7 @@ def delete_proj(project):
         delete_from_cache(project)
         exit()
     # if the tgt_folder is not a key in cache print not a project folder and exit
-    with open(cache_path, "r") as f:
+    with open(cache_path) as f:
         airflows = json.load(f)
         if project not in airflows:
             print(f"Not a project folder! {OOPS}")
@@ -48,14 +49,15 @@ def delete_proj(project):
     shutil.rmtree(tgt_path)
     print(f"Project {project} deleted! {YAY}")
 
+
 if __name__ == "__main__":
     # list all the projects
-    with open(cache_path, "r") as f:
+    with open(cache_path) as f:
         airflows = json.load(f)
         if len(airflows) > 0:
             print("Projects found:")
             for id, airflow in enumerate(airflows):
-                print(f" {id+1}. {airflow}")
+                print(f" {id + 1}. {airflow}")
         else:
             print(f"No projects found! {OOPS}")
     print(" 0. Exit")
@@ -77,12 +79,12 @@ if __name__ == "__main__":
         for project in airflows:
             delete_proj(project)
         if choice < -1:
-            farm_path = os.path.join(os.getcwd(), 'farm')
+            farm_path = os.path.join(os.getcwd(), "farm")
             if os.path.exists(cache_path):
                 os.system(f"docker-compose -f {farm_path}/docker-compose.yaml down")
                 os.system(f"docker-compose -f {farm_path}/docker-compose.yaml down -v")
                 shutil.rmtree(farm_path)
-            os.remove('.cache')
+            os.remove(".cache")
             print(f"Destroyed everything! {SAYONARA}")
     elif choice > 0:
-        delete_proj(list(airflows.keys())[choice-1])
+        delete_proj(list(airflows.keys())[choice - 1])
