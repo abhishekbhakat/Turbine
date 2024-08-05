@@ -42,7 +42,7 @@ dev = [
 ]
 
 [project.scripts]
-turbine = "turbine.cli:main"
+turbine = "turbine.interactive_cli:main"
 
 [project.urls]
 Documentation = "https://github.com/abhishekbhakat/turbine#readme"

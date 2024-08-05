@@ -1,3 +1,4 @@
+import click
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.styles import Style
@@ -63,9 +64,15 @@ class TurbineShell:
         raise EOFError
 
 
-def main():
-    shell = TurbineShell()
-    shell.run()
+@click.command()
+@click.option("--non-interactive", is_flag=True, help="Run in non-interactive mode")
+def main(non_interactive):
+    if non_interactive:
+        # Run your non-interactive CLI logic here
+        pass
+    else:
+        shell = TurbineShell()
+        shell.run()
 
 
 if __name__ == "__main__":
