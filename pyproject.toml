@@ -28,7 +28,6 @@ dependencies = [
     "click",
     "pyyaml",
     "docker",
-    "prompt_toolkit"
 ]
 
 [project.optional-dependencies]
@@ -42,7 +41,7 @@ dev = [
 ]
 
 [project.scripts]
-turbine = "turbine.interactive_cli:main"
+turbine = "turbine.cli:cli"
 
 [project.urls]
 Documentation = "https://github.com/abhishekbhakat/turbine#readme"
