@@ -19,6 +19,11 @@ from turbine.dockerfile_templates import (
 )
 from turbine.farm_utils import delete
 from turbine.farm_utils.composer import get_or_create_farm
+from turbine.templates import (
+    PROJECT_DOCKER_COMPOSE_TEMPLATE,
+    PROJECT_START_SCRIPT_TEMPLATE,
+    PROJECT_STOP_SCRIPT_TEMPLATE,
+)
 
 # Kaomoji for added character
 WORKING = "ᕦ(ò_óˇ)ᕤ"
@@ -122,144 +127,19 @@ def create_project():
         f.write(dockerfile_content)
 
     # Write project-specific docker-compose.yaml
-    docker_compose_content = f"""
-version: '3'
-services:
-  webserver:
-    build: .
-    image: {tgt_folder}
-    restart: always
-    environment:
-      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
-      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/{db_name}
-      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres/{db_name}
-      - AIRFLOW__CELERY__BROKER_URL=redis://:@redis:6379/{redisdb}
-      - AIRFLOW__CORE__FERNET_KEY=''
-      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=True
-      - AIRFLOW__CORE__LOAD_EXAMPLES=False
-      - AIRFLOW__API__AUTH_BACKEND=airflow.api.auth.backend.basic_auth
-    volumes:
-      - ./dags:/opt/airflow/dags
-      - ./logs:/opt/airflow/logs
-      - ./plugins:/opt/airflow/plugins
-    ports:
-      - "{webserver_port}:8080"
-    healthcheck:
-      test: ["CMD-SHELL", "[ -f /opt/airflow/airflow-webserver.pid ]"]
-      interval: 30s
-      timeout: 30s
-      retries: 3
-    networks:
-      - airflow-network
-
-  scheduler:
-    build: .
-    image: {tgt_folder}
-    restart: always
-    depends_on:
-      - webserver
-    environment:
-      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
-      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/{db_name}
-      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres/{db_name}
-      - AIRFLOW__CELERY__BROKER_URL=redis://:@redis:6379/{redisdb}
-      - AIRFLOW__CORE__FERNET_KEY=''
-    volumes:
-      - ./dags:/opt/airflow/dags
-      - ./logs:/opt/airflow/logs
-      - ./plugins:/opt/airflow/plugins
-    networks:
-      - airflow-network
-
-  worker:
-    build: .
-    image: {tgt_folder}
-    restart: always
-    depends_on:
-      - scheduler
-    environment:
-      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
-      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/{db_name}
-      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres/{db_name}
-      - AIRFLOW__CELERY__BROKER_URL=redis://:@redis:6379/{redisdb}
-      - AIRFLOW__CORE__FERNET_KEY=''
-    volumes:
-      - ./dags:/opt/airflow/dags
-      - ./logs:/opt/airflow/logs
-      - ./plugins:/opt/airflow/plugins
-    networks:
-      - airflow-network
-
-  flower:
-    build: .
-    image: {tgt_folder}
-    restart: always
-    depends_on:
-      - scheduler
-    environment:
-      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
-      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/{db_name}
-      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres/{db_name}
-      - AIRFLOW__CELERY__BROKER_URL=redis://:@redis:6379/{redisdb}
-      - AIRFLOW__CORE__FERNET_KEY=''
-    ports:
-      - "{flower_port}:5555"
-    networks:
-      - airflow-network
-
-networks:
-  airflow-network:
-    external: true
-"""
+    docker_compose_content = PROJECT_DOCKER_COMPOSE_TEMPLATE.format(tgt_folder=tgt_folder, db_name=db_name, redisdb=redisdb, webserver_port=webserver_port, flower_port=flower_port)
     with open(os.path.join(tgt_folder, "docker-compose.yaml"), "w") as f:
         f.write(docker_compose_content)
 
     # Write start.sh
-    start_script_content = f"""#!/bin/bash
-set -e
-
-PROJECT_DIR=$(pwd)
-PROJECT_NAME=$(basename "$PROJECT_DIR")
-AIRFLOW_IMAGE=$PROJECT_NAME
-DB_NAME={db_name}
-
-# Create project-specific database
-docker run --rm --network airflow-network postgres:13 psql -h postgres -U airflow -d airflow -c "CREATE DATABASE $DB_NAME;"
-
-# Create Airflow user
-docker run --rm --network airflow-network --entrypoint airflow \
-    "$AIRFLOW_IMAGE" \
-    users create \
-    --username admin \
-    --firstname FIRST_NAME \
-    --lastname LAST_NAME \
-    --role Admin \
-    --email admin@example.com \
-    --password admin
-
-# Initialize the database
-docker run --rm --network airflow-network --entrypoint airflow \
-    -e AIRFLOW__CORE__SQL_ALCHEMY_CONN="postgresql+psycopg2://airflow:airflow@postgres/$DB_NAME" \
-    "$AIRFLOW_IMAGE" \
-    db init
-
-# Start the services
-docker-compose up -d
-
-echo "Airflow project {tgt_folder} is running!"
-echo "Webserver will be available at http://localhost:{webserver_port}"
-echo "Flower will be available at http://localhost:{flower_port}"
-"""
+    start_script_content = PROJECT_START_SCRIPT_TEMPLATE.format(db_name=db_name, tgt_folder=tgt_folder, webserver_port=webserver_port, flower_port=flower_port)
     start_script_path = os.path.join(tgt_folder, "start.sh")
     with open(start_script_path, "w") as f:
         f.write(start_script_content)
     os.chmod(start_script_path, stat.S_IRWXU | stat.S_IRWXG | stat.S_IROTH | stat.S_IXOTH)
 
     # Write stop.sh
-    stop_script_content = f"""#!/bin/bash
-docker-compose down
-echo "Airflow project {tgt_folder} has been stopped."
-"""
+    stop_script_content = PROJECT_STOP_SCRIPT_TEMPLATE.format(tgt_folder=tgt_folder)
     stop_script_path = os.path.join(tgt_folder, "stop.sh")
     with open(stop_script_path, "w") as f:
         f.write(stop_script_content)
