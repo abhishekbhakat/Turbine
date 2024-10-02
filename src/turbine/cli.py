@@ -317,16 +317,30 @@ def delete_project(project_name):
         return
 
     click.echo(f"Deleting project {project_name}... {WORKING}")
-    delete.delete_proj(project_name)
-    click.echo(f"Project {project_name} deleted! {COOL}")
+    if delete.delete_proj(project_name):
+        click.echo(f"Project {project_name} deleted! {COOL}")
+    else:
+        click.echo(f"Deletion of project {project_name} was cancelled or failed. {UNSATISFIED}")
 
 
 @cli.command()
 def delete_farm():
     """Delete the entire farm and all projects"""
-    click.echo(f"Deleting farm and all projects... {WORKING}")
-    delete.delete_all()
-    click.echo(f"Farm and all projects deleted! {COOL}")
+    click.echo(f"Preparing to delete farm and all projects... {WORKING}")
+    if delete.delete_farm():
+        click.echo(f"Farm and selected projects deleted! {COOL}")
+    else:
+        click.echo(f"Deletion of farm was cancelled or failed. {UNSATISFIED}")
+
+
+@cli.command()
+def delete_all():
+    """Delete all projects and the farm"""
+    click.echo(f"Preparing to delete all projects and the farm... {WORKING}")
+    if delete.delete_all():
+        click.echo(f"All projects and the farm have been deleted! {COOL}")
+    else:
+        click.echo(f"Deletion process was cancelled or failed. {UNSATISFIED}")
 
 
 @cli.command()
