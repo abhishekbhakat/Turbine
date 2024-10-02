@@ -220,34 +220,52 @@ networks:
 PROJECT_START_SCRIPT_TEMPLATE = """#!/bin/bash
 set -e
 
+# Create logs directory if it doesn't exist
+mkdir -p logs
+
+# Function to log messages with timestamps
+log_message() {
+    echo "$(date +'%Y-%m-%d %H:%M:%S') - $1" | tee -a logs/start.log
+}
+
+# Redirect all output to start.log
+exec > >(tee -a logs/start.log) 2>&1
+
 PROJECT_DIR=$(pwd)
 PROJECT_NAME=$(basename "$PROJECT_DIR")
 AIRFLOW_IMAGE=$PROJECT_NAME
 DB_NAME={db_name}
 
+log_message "Starting Airflow project {tgt_folder}"
+
 # Create project-specific database
-docker run --rm --network airflow-network postgres:13 psql -h postgres -U airflow -d airflow -c "CREATE DATABASE $DB_NAME;"
+log_message "Creating project-specific database"
+docker run --rm --network airflow-network postgres:13 psql -h postgres -U airflow -d airflow -c "CREATE DATABASE $DB_NAME;" || log_message "Database already exists"
 
 # Create Airflow user
-docker run --rm --network airflow-network --entrypoint airflow \
+log_message "Creating Airflow user"
+docker run --rm --network airflow-network --entrypoint airflow \\
     "$AIRFLOW_IMAGE" \
     users create \
     --username admin \
     --firstname FIRST_NAME \
-    --lastname LAST_NAME \
+    --password admin || log_message "Airflow user already exists"
     --role Admin \
     --email admin@example.com \
-    --password admin
+log_message "Initializing the database"
+docker run --rm --network airflow-network --entrypoint airflow \\
 
 # Initialize the database
 docker run --rm --network airflow-network --entrypoint airflow \
     -e AIRFLOW__CORE__SQL_ALCHEMY_CONN="postgresql+psycopg2://airflow:airflow@postgres/$DB_NAME" \
     "$AIRFLOW_IMAGE" \
+log_message "Starting Airflow services"
     db init
 
-# Start the services
-docker-compose up -d
-
+log_message "Airflow project {tgt_folder} is running!"
+log_message "Webserver will be available at http://localhost:{webserver_port}"
+log_message "Flower will be available at http://localhost:{flower_port}"
+log_message "Startup complete. Check logs/start.log for more details."
 echo "Airflow project {tgt_folder} is running!"
 echo "Webserver will be available at http://localhost:{webserver_port}"
 echo "Flower will be available at http://localhost:{flower_port}"

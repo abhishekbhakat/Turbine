@@ -1,6 +1,8 @@
 import json
+import logging
 import os
 import stat
+import sys
 
 import click
 
@@ -34,6 +36,26 @@ UNSATISFIED = "(－‸ლ)"
 COOL = "(⌐■_■)"
 
 
+def setup_logging(log_file):
+    """Set up logging for the farm and projects"""
+    logging.basicConfig(filename=log_file, level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    # Add a stream handler to also log to console
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    console.setFormatter(formatter)
+    logging.getLogger("").addHandler(console)
+
+
+def redirect_output_to_log(log_file):
+    """Redirect stdout and stderr to the log file"""
+    sys.stdout = open(log_file, "a")
+    sys.stderr = open(log_file, "a")
+
+
+logger = logging.getLogger(__name__)
+
+
 @click.group()
 def cli():
     """Turbine CLI for managing Airflow deployments"""
@@ -43,8 +65,10 @@ def cli():
 @cli.command()
 def init_farm():
     """Initialize the farm"""
+    setup_logging("farm/start.log")
+    logger.info("Initializing farm...")
     get_or_create_farm()
-    click.echo(f"Farm initialized {COOL}")
+    logger.info(f"Farm initialized {COOL}")
 
 
 @cli.command()
@@ -52,9 +76,9 @@ def create_project():
     """Create a new Airflow project"""
     # Ensure farm is initialized before creating a project
     if not os.path.exists("farm"):
-        click.echo(f"Farm not initialized. Initializing farm... {WORKING}")
+        logger.info(f"Farm not initialized. Initializing farm... {WORKING}")
         get_or_create_farm()
-        click.echo(f"Farm initialized {COOL}")
+        logger.info(f"Farm initialized {COOL}")
 
     cache = load_cache()
 
@@ -99,10 +123,13 @@ def create_project():
         click.echo(f"Project {tgt_folder} already exists! {CONFUSED}")
         return
 
-    click.echo(f"Creating project {tgt_folder}... {WORKING}")
+    setup_logging(os.path.join(tgt_folder, "start.log"))
+    logger.info(f"Creating project {tgt_folder}... {WORKING}")
 
     os.makedirs(tgt_folder)
     os.makedirs(os.path.join(tgt_folder, "dags"))
+    if not os.path.exists(os.path.join(tgt_folder, "logs")):
+        os.makedirs(os.path.join(tgt_folder, "logs"))
     os.makedirs(os.path.join(tgt_folder, "logs"))
     os.makedirs(os.path.join(tgt_folder, "plugins"))
 
@@ -154,12 +181,12 @@ def create_project():
     project_data = {"type": airflow_type, "remote_logging": remote_logging, "vault": vault, "code_server": code_server, "redisdb": redisdb, "webserver": webserver_port, "flower": flower_port, "network": network, "db_name": db_name}
     add_project_to_cache(cache, tgt_folder, project_data)
 
-    click.echo(f"Project {tgt_folder} created successfully! {YAY}")
-    click.echo(f"Webserver port: {webserver_port}")
-    click.echo(f"Flower port: {flower_port}")
-    click.echo(f"Redis DB: {redisdb}")
-    click.echo(f"Network: {network}")
-    click.echo(f"Database name: {db_name}")
+    logger.info(f"Project {tgt_folder} created successfully! {YAY}")
+    logger.info(f"Webserver port: {webserver_port}")
+    logger.info(f"Flower port: {flower_port}")
+    logger.info(f"Redis DB: {redisdb}")
+    logger.info(f"Network: {network}")
+    logger.info(f"Database name: {db_name}")
 
 
 @cli.command()
@@ -170,9 +197,11 @@ def start_project(project_name):
         click.echo(f"Project {project_name} does not exist! {CONFUSED}")
         return
 
-    click.echo(f"Starting project {project_name}... {WORKING}")
+    log_file = os.path.join(project_name, "start.log")
+    redirect_output_to_log(log_file)
+    logger.info(f"Starting project {project_name}... {WORKING}")
     os.system(f"cd {project_name} && ./start.sh")
-    click.echo(f"Project {project_name} started! {COOL}")
+    logger.info(f"Project {project_name} started! {COOL}")
 
 
 @cli.command()
