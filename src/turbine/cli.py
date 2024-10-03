@@ -34,9 +34,14 @@ def delete_farm():
 
 @cli.command()
 def delete_all():
-    """Delete all projects and the farm"""
+    """Delete all projects"""
+    confirmation = click.confirm("Are you sure you want to delete all projects? This action cannot be undone.", default=False)
+    if not confirmation:
+        logger.info("Deletion cancelled.")
+        return
+
     if delete_all_impl():
-        logger.info(f"All projects and the farm have been deleted! {COOL}")
+        logger.info(f"All projects have been deleted! {COOL}")
     else:
         logger.error(f"Deletion process was cancelled or failed. {UNSATISFIED}")
 
@@ -45,16 +50,18 @@ def delete_all():
 def init_farm():
     """Initialize the farm"""
     farm_log_file = os.path.join(os.getcwd(), "farm", "start.log")
+    recreating = False
     if os.path.exists(os.path.dirname(farm_log_file)):
         if click.confirm("Farm already exists. Do you want to delete everything and create a new farm?", default=False):
             delete_all_impl()
+            recreating = True
         else:
             logger.info("Keeping existing farm. Initialization cancelled.")
             return
 
     setup_logging(farm_log_file)
     logger.info("Initializing farm...")
-    get_or_create_farm()
+    get_or_create_farm(recreating)
     logger.info(f"Farm initialized {COOL}")
 
 
