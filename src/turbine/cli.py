@@ -1,57 +1,18 @@
 import json
 import logging
 import os
-import stat
 import sys
 
 import click
 
+from turbine.airflow_projects.project_utils import initialize_project_structure, start_project, stop_project, write_project_files
 from turbine.cache import (
     add_project_to_cache,
-    generate_db_name,
-    get_next_flower_port,
-    get_next_network,
-    get_next_redis_db,
-    get_next_webserver_port,
     load_cache,
 )
-from turbine.dockerfile_templates import (
-    AIRFLOW_DOCKERFILE,
-    CODE_SERVER_DOCKERFILE,
-)
-from turbine.farm_utils import delete
-from turbine.farm_utils.composer import get_or_create_farm
-from turbine.templates import (
-    PROJECT_DOCKER_COMPOSE_TEMPLATE,
-    PROJECT_START_SCRIPT_TEMPLATE,
-    PROJECT_STOP_SCRIPT_TEMPLATE,
-)
-
-# Kaomoji for added character
-WORKING = "ᕦ(ò_óˇ)ᕤ"
-YAY = "(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧"
-ANGRY = "(╯°□°）╯︵ ┻━┻"
-CONFUSED = "(-_-;)・・・"
-UNSATISFIED = "(－‸ლ)"
-COOL = "(⌐■_■)"
-
-
-def setup_logging(log_file):
-    """Set up logging for the farm and projects"""
-    logging.basicConfig(filename=log_file, level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
-    # Add a stream handler to also log to console
-    console = logging.StreamHandler()
-    console.setLevel(logging.INFO)
-    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    console.setFormatter(formatter)
-    logging.getLogger("").addHandler(console)
-
-
-def redirect_output_to_log(log_file):
-    """Redirect stdout and stderr to the log file"""
-    sys.stdout = open(log_file, "a")
-    sys.stderr = open(log_file, "a")
-
+from turbine.farm.composer import get_or_create_farm
+from turbine.farm.delete import delete_all_impl, delete_farm_impl, delete_proj
+from turbine.farm.farm_utils import ANGRY, CONFUSED, COOL, UNSATISFIED, WORKING, YAY, redirect_output_to_log, setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -63,16 +24,42 @@ def cli():
 
 
 @cli.command()
+def delete_farm():
+    """Delete the entire farm and all projects"""
+    if delete_farm_impl():
+        logger.info(f"Farm and selected projects deleted! {COOL}")
+    else:
+        logger.error(f"Deletion of farm was cancelled or failed. {UNSATISFIED}")
+
+
+@cli.command()
+def delete_all():
+    """Delete all projects and the farm"""
+    if delete_all_impl():
+        logger.info(f"All projects and the farm have been deleted! {COOL}")
+    else:
+        logger.error(f"Deletion process was cancelled or failed. {UNSATISFIED}")
+
+
+@cli.command()
 def init_farm():
     """Initialize the farm"""
-    setup_logging("farm/start.log")
+    farm_log_file = os.path.join(os.getcwd(), "farm", "start.log")
+    if os.path.exists(os.path.dirname(farm_log_file)):
+        if click.confirm("Farm already exists. Do you want to delete everything and create a new farm?", default=False):
+            delete_all_impl()
+        else:
+            logger.info("Keeping existing farm. Initialization cancelled.")
+            return
+
+    setup_logging(farm_log_file)
     logger.info("Initializing farm...")
     get_or_create_farm()
     logger.info(f"Farm initialized {COOL}")
 
 
 @cli.command()
-def create_project():
+def create_airflow_project():
     """Create a new Airflow project"""
     # Ensure farm is initialized before creating a project
     if not os.path.exists("farm"):
@@ -83,7 +70,6 @@ def create_project():
     cache = load_cache()
 
     name = click.prompt("Project name", type=str)
-
     click.echo("Airflow type:")
     click.echo("1. Astro [default]")
     click.echo("2. OSS")
@@ -119,65 +105,23 @@ def create_project():
 
     tgt_folder = f"{name.lower()}-{airflow_type}-airflow"
 
-    if os.path.exists(tgt_folder):
-        click.echo(f"Project {tgt_folder} already exists! {CONFUSED}")
+    tgt_folder_path = os.path.join(os.getcwd(), tgt_folder)
+    if os.path.exists(tgt_folder_path):
+        logger.error(f"Project {tgt_folder} already exists! {CONFUSED}")
         return
 
-    setup_logging(os.path.join(tgt_folder, "start.log"))
-    logger.info(f"Creating project {tgt_folder}... {WORKING}")
+    try:
+        setup_logging(os.path.join(tgt_folder_path, "start.log"))
+        logger.info(f"Creating project {tgt_folder}... {WORKING}")
 
-    os.makedirs(tgt_folder)
-    os.makedirs(os.path.join(tgt_folder, "dags"))
-    if not os.path.exists(os.path.join(tgt_folder, "logs")):
-        os.makedirs(os.path.join(tgt_folder, "logs"))
-    os.makedirs(os.path.join(tgt_folder, "logs"))
-    os.makedirs(os.path.join(tgt_folder, "plugins"))
+        initialize_project_structure(tgt_folder_path)
 
-    # Get the next available ports and resources
-    webserver_port = get_next_webserver_port(cache)
-    flower_port = get_next_flower_port(cache)
-    redisdb = get_next_redis_db(cache)
-    network = get_next_network(cache)
-    db_name = generate_db_name(tgt_folder)
+        webserver_port, flower_port, redisdb, network, db_name = write_project_files(tgt_folder_path, tgt_folder, cache, remote_logging, vault, code_server, airflow_type, docker_remote_con_id, docker_remote_base_folder)
+    except Exception as e:
+        logger.error(f"Failed to create project {tgt_folder}: {str(e)} {ANGRY}")
+        return
 
-    # Write Dockerfile
-    dockerfile_content = AIRFLOW_DOCKERFILE.format(
-        project_name=tgt_folder,
-        redisdb=redisdb,
-        remote_login=str(remote_logging).lower(),
-        vault_backend='"airflow.providers.hashicorp.secrets.vault.VaultBackend"' if vault else '""',
-        arch="amd64",  # You might want to make this dynamic based on the system architecture
-        docker_remote_con_id=docker_remote_con_id,
-        docker_remote_base_folder=docker_remote_base_folder,
-    )
-    with open(os.path.join(tgt_folder, "Dockerfile"), "w") as f:
-        f.write(dockerfile_content)
-
-    # Write project-specific docker-compose.yaml
-    docker_compose_content = PROJECT_DOCKER_COMPOSE_TEMPLATE.format(tgt_folder=tgt_folder, db_name=db_name, redisdb=redisdb, webserver_port=webserver_port, flower_port=flower_port)
-    with open(os.path.join(tgt_folder, "docker-compose.yaml"), "w") as f:
-        f.write(docker_compose_content)
-
-    # Write start.sh
-    start_script_content = PROJECT_START_SCRIPT_TEMPLATE.format(db_name=db_name, tgt_folder=tgt_folder, webserver_port=webserver_port, flower_port=flower_port)
-    start_script_path = os.path.join(tgt_folder, "start.sh")
-    with open(start_script_path, "w") as f:
-        f.write(start_script_content)
-    os.chmod(start_script_path, stat.S_IRWXU | stat.S_IRWXG | stat.S_IROTH | stat.S_IXOTH)
-
-    # Write stop.sh
-    stop_script_content = PROJECT_STOP_SCRIPT_TEMPLATE.format(tgt_folder=tgt_folder)
-    stop_script_path = os.path.join(tgt_folder, "stop.sh")
-    with open(stop_script_path, "w") as f:
-        f.write(stop_script_content)
-    os.chmod(stop_script_path, stat.S_IRWXU | stat.S_IRWXG | stat.S_IROTH | stat.S_IXOTH)
-
-    if code_server:
-        code_dockerfile_content = CODE_SERVER_DOCKERFILE.format(code_p=8080)  # You may want to dynamically assign this port
-        with open(os.path.join(tgt_folder, "code.Dockerfile"), "w") as f:
-            f.write(code_dockerfile_content)
-
-    # Update cache
+    # Log project details
     project_data = {"type": airflow_type, "remote_logging": remote_logging, "vault": vault, "code_server": code_server, "redisdb": redisdb, "webserver": webserver_port, "flower": flower_port, "network": network, "db_name": db_name}
     add_project_to_cache(cache, tgt_folder, project_data)
 
@@ -191,86 +135,69 @@ def create_project():
 
 @cli.command()
 @click.argument("project_name")
-def start_project(project_name):
+def start_airflow_project(project_name):
     """Start an Airflow project"""
-    if not os.path.exists(project_name):
-        click.echo(f"Project {project_name} does not exist! {CONFUSED}")
+    project_path = os.path.join(os.getcwd(), project_name)
+    if not os.path.exists(project_path):
+        logger.error(f"Project {project_name} does not exist! {CONFUSED}")
         return
 
-    log_file = os.path.join(project_name, "start.log")
+    log_file = os.path.join(project_path, "start.log")
     redirect_output_to_log(log_file)
     logger.info(f"Starting project {project_name}... {WORKING}")
-    os.system(f"cd {project_name} && ./start.sh")
-    logger.info(f"Project {project_name} started! {COOL}")
+    if start_project(project_name):
+        logger.info(f"Project {project_name} started! {COOL}")
+    else:
+        logger.error(f"Failed to start project {project_name}. {CONFUSED}")
 
 
 @cli.command()
 @click.argument("project_name")
-def stop_project(project_name):
+def stop_airflow_project(project_name):
     """Stop an Airflow project"""
-    if not os.path.exists(project_name):
-        click.echo(f"Project {project_name} does not exist! {CONFUSED}")
-        return
-
-    click.echo(f"Stopping project {project_name}... {WORKING}")
-    os.system(f"cd {project_name} && ./stop.sh")
-    click.echo(f"Project {project_name} stopped! {COOL}")
+    logger.info(f"Stopping project {project_name}... {WORKING}")
+    if stop_project(project_name):
+        logger.info(f"Project {project_name} stopped! {COOL}")
+    else:
+        logger.error(f"Failed to stop project {project_name}. {CONFUSED}")
 
 
 @cli.command()
 @click.argument("project_name")
-def delete_project(project_name):
+def delete_airflow_project(project_name):
     """Delete an Airflow project"""
-    if not os.path.exists(project_name):
-        click.echo(f"Project {project_name} does not exist! {CONFUSED}")
+    project_path = os.path.join(os.getcwd(), project_name)
+    if not os.path.exists(project_path):
+        logger.error(f"Project {project_name} does not exist! {CONFUSED}")
         return
 
-    click.echo(f"Deleting project {project_name}... {WORKING}")
-    if delete.delete_proj(project_name):
-        click.echo(f"Project {project_name} deleted! {COOL}")
+    logger.info(f"Deleting project {project_name}... {WORKING}")
+    if delete_proj(project_name):
+        logger.info(f"Project {project_name} deleted! {COOL}")
     else:
-        click.echo(f"Deletion of project {project_name} was cancelled or failed. {UNSATISFIED}")
+        logger.error(f"Deletion of project {project_name} was cancelled or failed. {UNSATISFIED}")
 
 
 @cli.command()
-def delete_farm():
-    """Delete the entire farm and all projects"""
-    click.echo(f"Preparing to delete farm and all projects... {WORKING}")
-    if delete.delete_farm():
-        click.echo(f"Farm and selected projects deleted! {COOL}")
-    else:
-        click.echo(f"Deletion of farm was cancelled or failed. {UNSATISFIED}")
-
-
-@cli.command()
-def delete_all():
-    """Delete all projects and the farm"""
-    click.echo(f"Preparing to delete all projects and the farm... {WORKING}")
-    if delete.delete_all():
-        click.echo(f"All projects and the farm have been deleted! {COOL}")
-    else:
-        click.echo(f"Deletion process was cancelled or failed. {UNSATISFIED}")
-
-
-@cli.command()
-def list_projects():
+def list_airflow_projects():
     """List all Airflow projects"""
     cache_file = ".cache"
     if not os.path.exists(cache_file):
-        click.echo(f"No projects found! {CONFUSED}")
+        logger.info(f"No projects found! {CONFUSED}")
         return
 
     with open(cache_file) as f:
         airflows = json.load(f)
 
     if not airflows:
-        click.echo(f"No projects found! {CONFUSED}")
+        logger.info(f"No projects found! {CONFUSED}")
         return
 
-    click.echo(f"Airflow projects: {COOL}")
+    logger.info(f"Airflow projects: {COOL}")
     for project in airflows.keys():
-        click.echo(f"- {project}")
+        logger.info(f"- {project}")
 
 
 if __name__ == "__main__":
-    cli()
+    print(f"Debug: __main__ called with sys.argv = {sys.argv}", file=sys.stderr)
+    cli(prog_name="turbine")
