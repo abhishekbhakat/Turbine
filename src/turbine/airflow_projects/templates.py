@@ -70,7 +70,7 @@ services:
     <<: *airflow-common
     command: scheduler
     healthcheck:
-      test: ["CMD-SHELL", 'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"']
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname 'scheduler'"]
       interval: 10s
       timeout: 10s
       retries: 5
@@ -86,7 +86,7 @@ services:
     healthcheck:
       test:
         - "CMD-SHELL"
-        - 'celery --app airflow.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}"'
+        - 'celery --app airflow.executors.celery_executor.app inspect ping -d "celery@worker"'
       interval: 10s
       timeout: 10s
       retries: 5
@@ -105,7 +105,7 @@ services:
     <<: *airflow-common
     command: triggerer
     healthcheck:
-      test: ["CMD-SHELL", 'airflow jobs check --job-type TriggererJob --hostname "$${HOSTNAME}"']
+      test: ["CMD-SHELL", "airflow jobs check --job-type TriggererJob --hostname 'triggerer'"]
       interval: 10s
       timeout: 10s
       retries: 5
