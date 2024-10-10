@@ -131,3 +131,6 @@ dmypy.json
 .DS_Store
 
 barn/
+
+.vscode/
+.ruff_cache/
